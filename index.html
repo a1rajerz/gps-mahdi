@@ -364,6 +364,9 @@
             .desc { margin-top: 10px; height: 60px; }
             .footer { display: flex; justify-content: space-between; margin-top: auto; font-size: 13px; font-weight: bold; }
         }
+
+        /* نشانگر شمال برای خروجی تصویر */
+        .north-indicator { position: absolute; top: 6px; right: 8px; background: rgba(255,255,255,0.9); color: #000; border: 1px solid #000; border-radius: 6px; padding: 4px 6px; font-weight: bold; }
         
         /* انیمیشن‌ها */
         @keyframes pulse {
@@ -434,8 +437,9 @@
                 height: 100dvh;
                 overflow: hidden;
             }
-            .container { padding-bottom: 88px; }
-            .map-container { height: calc(100dvh - 220px); }
+            header, footer { display: none; }
+            .container { padding: 0 0 88px 0; }
+            .map-container { height: calc(100dvh - 88px); border-radius: 0; border-width: 0; }
             .gps-info { display: none; }
             .controls {
                 position: fixed;
@@ -483,6 +487,9 @@
             background: #444;
             color: #fff;
         }
+
+        /* Toast for non-blocking messages */
+        #toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--primary-color); z-index: 4000; display: none; box-shadow: 0 0 12px var(--glow-color); }
     </style>
 </head>
 <body>
@@ -562,8 +569,8 @@
             <div class="form-group">
                 <label for="coordinate-system">سیستم مختصات:</label>
                 <select id="coordinate-system" class="form-control">
+                    <option value="utm" selected>UTM</option>
                     <option value="wgs84">WGS84 (طول و عرض جغرافیایی)</option>
-                    <option value="utm">UTM</option>
                 </select>
             </div>
             <div class="form-group">
@@ -639,7 +646,10 @@
             <div>
                 <h1>نقشه اراضی تصرفی</h1>
 
-                <div class="box map-main"><div id="print-main-map" style="width:100%;height:100%"></div></div>
+                <div class="box map-main" style="position:relative;">
+                    <div id="print-main-map" style="width:100%;height:100%"></div>
+                    <div class="north-indicator">🧭 N</div>
+                </div>
 
                 <div class="box utm-box">
                     <p><b>مختصات UTM (84):</b></p>
@@ -690,6 +700,8 @@
         <button id="dismiss-pwa-btn">بعداً</button>
     </div>
 
+    <div id="toast"></div>
+
     <!-- بارگذاری کتابخانه‌های مورد نیاز -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
@@ -707,6 +719,7 @@
         let satelliteLayer, streetLayer, trafficLayer;
         let watchId = null;
         let deferredPrompt;
+        let lastToastTime = 0;
         
         // مقداردهی اولیه نقشه
         function initMap() {
@@ -830,7 +843,7 @@
                 },
                 {
                     enableHighAccuracy: highAccuracy,
-                    timeout: 10000,
+                    timeout: 30000,
                     maximumAge: 0
                 }
             );
@@ -847,9 +860,21 @@
                 accuracy: accuracy
             };
             
-            // به‌روزرسانی مختصات در پنل اطلاعات
-            document.getElementById('longitude').textContent = lat.toFixed(6);
-            document.getElementById('latitude').textContent = lng.toFixed(6);
+            // به‌روزرسانی مختصات در پنل اطلاعات (نمایش UTM در حالت پیشفرض)
+            if (document.getElementById('coordinate-system').value === 'utm') {
+                try {
+                    const zone = parseInt(document.getElementById('zone').value || '39', 10);
+                    const utmCoord = window.utm.fromLatLon(lat, lng, zone);
+                    document.getElementById('longitude').textContent = utmCoord.easting.toFixed(2);
+                    document.getElementById('latitude').textContent = utmCoord.northing.toFixed(2);
+                } catch (e) {
+                    document.getElementById('longitude').textContent = lat.toFixed(6);
+                    document.getElementById('latitude').textContent = lng.toFixed(6);
+                }
+            } else {
+                document.getElementById('longitude').textContent = lat.toFixed(6);
+                document.getElementById('latitude').textContent = lng.toFixed(6);
+            }
             document.getElementById('accuracy').textContent = accuracy.toFixed(2);
             
             // شبیه‌سازی تعداد ماهواره‌ها و قدرت سیگنال
@@ -879,8 +904,7 @@
                 default:
                     errorMsg = "خطای ناشناخته رخ داد";
             }
-            
-            alert('خطا در دریافت موقعیت: ' + errorMsg);
+            showToast('خطا در دریافت موقعیت: ' + errorMsg);
         }
         
         // به‌روزرسانی اطلاعات ماهواره
@@ -1079,19 +1103,33 @@
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
                     }
+                    setTimeout(() => m.invalidateSize(), 100);
                     return m;
                 }
 
                 renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
                 renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'));
-                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', { subdomains: ['mt0','mt1','mt2','mt3'] }));
+                // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
+                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
 
-                // چاپ
-                setTimeout(() => { window.print(); }, 250);
+                // تبدیل صفحه به تصویر A4 و دانلود
+                await new Promise(r => setTimeout(r, 600));
+                const pageEl = document.querySelector('#print-output .page');
+                const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
+                const dataURL = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'نقشه_A4.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                // پنهان‌سازی خروجی پس از تولید
+                setTimeout(() => { printRoot.style.display = 'none'; }, 200);
 
             } catch (err) {
                 console.error(err);
-                alert('خطا در آماده‌سازی خروجی چاپ');
+                showToast('خطا در آماده‌سازی خروجی');
             }
         }
         
@@ -1202,7 +1240,7 @@
         
         // تولید خروجی DXF
         async function generateDXF() {
-            // ایجاد هدر فایل DXF
+            // ایجاد هدر فایل DXF (استفاده از UTM برای سازگاری با AutoCAD)
             let dxfContent = `  0
 SECTION
   2
@@ -1215,6 +1253,16 @@ SECTION
 ENTITIES
 `;
             
+            // تبدیل نقاط به UTM اگر سیستم روی UTM نیست
+            const zone = parseInt(document.getElementById('zone').value || '39', 10);
+            const pts = points.map(p => {
+                if (document.getElementById('coordinate-system').value === 'utm') { return p; }
+                try {
+                    const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone);
+                    return { lat: utmCoord.northing, lng: utmCoord.easting };
+                } catch (e) { return p; }
+            });
+
             // اضافه کردن پلی‌لاین
             dxfContent += `  0
 LWPOLYLINE
@@ -1227,17 +1275,17 @@ AcDbEntity
   100
 AcDbPolyline
   90
-${points.length}
+${pts.length}
   70
 1
 `;
             
             // اضافه کردن نقاط
-            points.forEach(point => {
+            pts.forEach(point => {
                 dxfContent += `  10
-${point.lng.toFixed(6)}
+${point.lng.toFixed(3)}
   20
-${point.lat.toFixed(6)}
+${point.lat.toFixed(3)}
 `;
             });
             
@@ -1266,7 +1314,7 @@ EOF
                 this.classList.add('pulse');
                 
                 if (!currentLocation) {
-                    alert('در حال دریافت موقعیت... لطفاً چند ثانیه صبر کنید');
+                    showToast('در حال دریافت موقعیت... لطفاً چند ثانیه صبر کنید');
                 } else {
                     addPoint(currentLocation.latlng);
                     captureMode = false;
@@ -1280,7 +1328,7 @@ EOF
                 if (drawMode) {
                     this.classList.add('btn-primary');
                     map.on('click', handleMapClick);
-                    alert('حالت ترسیم فعال شد. روی نقشه کلیک کنید تا نقاط ایجاد شوند');
+                    showToast('حالت ترسیم فعال شد. روی نقشه کلیک کنید تا نقاط ایجاد شوند');
                 } else {
                     this.classList.remove('btn-primary');
                     map.off('click', handleMapClick);
@@ -1318,7 +1366,7 @@ EOF
                         setActiveLayerButton(document.getElementById('satellite-layer'));
                     }
                 } catch (e) {
-                    alert('دریافت موقعیت ناموفق بود');
+                    showToast('دریافت موقعیت ناموفق بود');
                 }
             });
             
@@ -1340,7 +1388,7 @@ EOF
             // ذخیره تنظیمات
             document.getElementById('save-settings').addEventListener('click', function() {
                 startWatchingLocation();
-                alert('تنظیمات ذخیره شد');
+                showToast('تنظیمات ذخیره شد');
                 document.getElementById('settings-modal').style.display = 'none';
             });
             
@@ -1402,6 +1450,18 @@ EOF
             addPoint(e.latlng);
         }
         
+        // پیامک غیرمزاحم
+        function showToast(message) {
+            const now = Date.now();
+            if (now - lastToastTime < 5000) { return; }
+            lastToastTime = now;
+            const el = document.getElementById('toast');
+            el.textContent = message;
+            el.style.display = 'block';
+            clearTimeout(el._hideTimer);
+            el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+        }
+
         // ثبت Service Worker
         async function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
@@ -1422,19 +1482,9 @@ EOF
             
             // بررسی پشتیبانی از Geolocation API
             if (!navigator.geolocation) {
-                alert('مرورگر شما از Geolocation API پشتیبانی نمی‌کند');
+                showToast('مرورگر شما از Geolocation API پشتیبانی نمی‌کند');
                 return;
             }
-            
-            // درخواست دسترسی به موقعیت‌یابی
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    console.log('دسترسی به موقعیت مکانی granted شد');
-                },
-                function(error) {
-                    alert('لطفاً دسترسی به موقعیت مکانی را允许 کنید تا برنامه به درستی کار کند');
-                }
-            );
         });
     </script>
 </body>
