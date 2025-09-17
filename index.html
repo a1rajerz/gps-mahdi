@@ -2,7 +2,7 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>نرم افزار نقشه برداری GPS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -129,13 +129,16 @@
         .controls {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-            padding: 20px;
+            gap: 10px;
+            flex-wrap: nowrap;
+            padding: 10px;
             background: var(--card-bg);
             border-radius: 10px;
             border: 2px solid var(--primary-color);
             box-shadow: 0 0 15px var(--glow-color);
+            position: sticky;
+            bottom: 10px;
+            z-index: 1001;
         }
         
         .btn {
@@ -476,20 +479,23 @@
         
         /* responsive design */
         @media (max-width: 768px) {
-            .gps-info {
-                flex-direction: column;
-                gap: 10px;
+            body {
+                height: 100dvh;
+                overflow: hidden;
             }
-            
+            .container { padding-bottom: 88px; }
+            .map-container { height: calc(100dvh - 220px); }
+            .gps-info { display: none; }
             .controls {
-                flex-direction: column;
-                align-items: center;
+                position: fixed;
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+                gap: 8px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
             }
-            
-            .btn {
-                width: 100%;
-                max-width: 300px;
-            }
+            .btn { white-space: nowrap; padding: 10px 14px; border-radius: 40px; }
         }
         
         /* نوار وضعیت PWA */
@@ -538,6 +544,9 @@
                     <button id="street-layer">نقشه</button>
                     <button id="traffic-layer">ترافیک</button>
                 </div>
+                <button id="locate-me" title="موقعیت من" style="position:absolute; right:10px; bottom:10px; z-index:1002; background:#fff; border:2px solid var(--primary-color); border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.3);">
+                    <i class="fas fa-location-crosshairs" style="color:#000;"></i>
+                </button>
             </div>
             
             <div class="controls">
@@ -1299,6 +1308,23 @@ EOF
             document.getElementById('export-kmz').addEventListener('click', generateKMZ);
             document.getElementById('export-dxf').addEventListener('click', generateDXF);
             
+            // دکمه موقعیت من
+            document.getElementById('locate-me').addEventListener('click', async function() {
+                try {
+                    if (!currentLocation) {
+                        await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(p => { handleLocationFound(p); res(); }, rej, { enableHighAccuracy: true }));
+                    }
+                    if (currentLocation && currentLocation.latlng) {
+                        map.setView(currentLocation.latlng, Math.max(map.getZoom(), 17));
+                        // نمایش لایه ماهواره‌ای برای مشاهده واضح
+                        map.removeLayer(streetLayer); map.removeLayer(trafficLayer); satelliteLayer.addTo(map);
+                        setActiveLayerButton(document.getElementById('satellite-layer'));
+                    }
+                } catch (e) {
+                    alert('دریافت موقعیت ناموفق بود');
+                }
+            });
+            
             // دکمه‌های بستن مودال
             document.querySelectorAll('.close-modal').forEach(button => {
                 button.addEventListener('click', function() {
@@ -1307,11 +1333,11 @@ EOF
             });
             
             // ثبت فرم اطلاعات
-            document.getElementById('map-data-form').addEventListener('submit', function(e) {
+            document.getElementById('map-data-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                generateOutput();
-                this.reset();
                 document.getElementById('data-modal').style.display = 'none';
+                await generatePDF();
+                this.reset();
             });
             
             // ذخیره تنظیمات
