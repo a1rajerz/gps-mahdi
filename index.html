@@ -34,6 +34,8 @@
                 radial-gradient(circle at 10% 20%, rgba(255, 119, 0, 0.1) 0%, transparent 20%),
                 radial-gradient(circle at 90% 80%, rgba(255, 119, 0, 0.1) 0%, transparent 20%);
         }
+        /* عدم نمایش خروجی چاپ در حالت عادی */
+        #print-output { display: none; }
         
         .container {
             max-width: 1200px;
@@ -337,78 +339,30 @@
             box-shadow: 0 0 10px var(--glow-color);
         }
         
-        /* استایل برای خروجی چاپ */
+        /* استایل برای خروجی چاپ (قالب A4 پیشنهادی) */
         @media print {
-            body * {
-                visibility: hidden;
+            body * { visibility: hidden; }
+            .print-container, .print-container * { visibility: visible; }
+            .print-container { position: absolute; inset: 0; margin: 0; padding: 0; }
+            .page {
+                width: 210mm; height: 297mm; margin: auto; border: 3px solid #000; padding: 15px;
+                box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
+                background: #fff; color: #000; font-family: Tahoma, sans-serif;
             }
-            .print-container, .print-container * {
-                visibility: visible;
-            }
-            .print-container {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 0;
-                margin: 0;
-            }
-            
-            .print-output {
-                width: 21cm;
-                height: 29.7cm;
-                padding: 1cm;
-                margin: 0;
-                box-sizing: border-box;
-                background: white;
-                color: black;
-                font-family: Arial, sans-serif;
-            }
-            
-            .print-map {
-                width: 100%;
-                height: 200px;
-                background: #f0f0f0;
-                margin-bottom: 10px;
-                border: 1px solid #ccc;
-            }
-            
-            .print-section {
-                margin-bottom: 15px;
-            }
-            
-            .print-flex {
-                display: flex;
-                gap: 15px;
-            }
-            
-            .print-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 15px;
-            }
-            
-            .print-table, .print-table th, .print-table td {
-                border: 1px solid #ccc;
-            }
-            
-            .print-table th, .print-table td {
-                padding: 8px;
-                text-align: center;
-            }
-            
-            .print-info {
-                flex: 1;
-                border: 1px solid #ccc;
-                padding: 10px;
-            }
-            
-            .print-satellite, .print-traffic {
-                height: 150px;
-                background: #f0f0f0;
-                border: 1px solid #ccc;
-                margin-bottom: 15px;
-            }
+            h1 { text-align: center; margin-bottom: 15px; font-size: 20px; font-weight: bold; color: #000; text-shadow: none; }
+            .box { border: 2px solid #000; border-radius: 8px; padding: 10px; box-sizing: border-box; background: #fafafa; }
+            .map-main { width: 100%; height: 300px; margin-bottom: 15px; }
+            .utm-box { width: 100%; height: 140px; margin-bottom: 25px; text-align: center; font-size: 13px; }
+            .utm-box table { width: 100%; border-collapse: collapse; }
+            .utm-box th, .utm-box td { border: 1px solid #000; padding: 4px; }
+            .content-section { display: flex; gap: 15px; margin-top: 20px; }
+            .images { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+            .satellite, .traffic { flex: 1; height: 120px; }
+            .info-box { flex: 1; font-size: 13px; display: flex; flex-direction: column; justify-content: space-between; }
+            .info-box table { width: 100%; border-collapse: collapse; }
+            .info-box td { padding: 4px; border-bottom: 1px solid #ccc; }
+            .desc { margin-top: 10px; height: 60px; }
+            .footer { display: flex; justify-content: space-between; margin-top: auto; font-size: 13px; font-weight: bold; }
         }
         
         /* انیمیشن‌ها */
@@ -488,11 +442,16 @@
                 left: 10px;
                 right: 10px;
                 bottom: 10px;
-                gap: 8px;
+                gap: 10px;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
             }
-            .btn { white-space: nowrap; padding: 10px 14px; border-radius: 40px; }
+            /* دکمه‌های دایره‌ای و بزرگ‌تر */
+            .controls .btn {
+                width: 64px; height: 64px; padding: 0; border-radius: 50%; display: inline-flex;
+                align-items: center; justify-content: center; font-size: 0;
+            }
+            .controls .btn i { font-size: 20px; margin: 0; }
         }
         
         /* نوار وضعیت PWA */
@@ -541,7 +500,7 @@
                     <button id="street-layer">نقشه</button>
                     <button id="traffic-layer">ترافیک</button>
                 </div>
-                <button id="locate-me" title="موقعیت من" style="position:absolute; right:10px; bottom:10px; z-index:1002; background:#fff; border:2px solid var(--primary-color); border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.3);">
+                <button id="locate-me" title="موقعیت من" style="position:absolute; right:10px; top:10px; z-index:1002; background:#fff; border:2px solid var(--primary-color); border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.3);">
                     <i class="fas fa-location-crosshairs" style="color:#000;"></i>
                 </button>
             </div>
@@ -676,46 +635,47 @@
     
     <!-- بخش چاپ -->
     <div id="print-output" class="print-container">
-        <div class="print-output">
-            <h2 style="text-align: center; margin-bottom: 15px;">گزارش نقشه برداری</h2>
-            
-            <div class="print-flex">
-                <div style="flex: 2;">
-                    <div class="print-map" id="print-map"></div>
-                    <table class="print-table">
+        <div class="page">
+            <div>
+                <h1>نقشه اراضی تصرفی</h1>
+
+                <div class="box map-main"><div id="print-main-map" style="width:100%;height:100%"></div></div>
+
+                <div class="box utm-box">
+                    <p><b>مختصات UTM (84):</b></p>
+                    <table>
                         <thead>
-                            <tr>
-                                <th>ردیف</th>
-                                <th>طول جغرافیایی (X)</th>
-                                <th>عرض جغرافیایی (Y)</th>
-                            </tr>
+                            <tr><th>نقطه</th><th>X</th><th>Y</th></tr>
                         </thead>
-                        <tbody id="coordinates-table">
-                            <!-- مختصات نقاط اینجا نمایش داده می‌شود -->
-                        </tbody>
+                        <tbody id="utm-table"></tbody>
                     </table>
                 </div>
-                
-                <div class="print-info">
-                    <h3>اطلاعات ثبتی</h3>
-                    <p><strong>نام و نام خانوادگی:</strong> <span id="print-fullname"></span></p>
-                    <p><strong>نام پدر:</strong> <span id="print-fathername"></span></p>
-                    <p><strong>کد ملی:</strong> <span id="print-nationalcode"></span></p>
-                    <p><strong>منطقه:</strong> <span id="print-region"></span></p>
-                    <p><strong>پلاک اصلی:</strong> <span id="print-main-plate"></span></p>
-                    <p><strong>پلاک فرعی:</strong> <span id="print-sub-plate"></span></p>
-                    <p><strong>مساحت:</strong> <span id="print-area"></span> متر مربع</p>
+
+                <div class="content-section">
+                    <div class="images">
+                        <div class="box satellite"><div id="print-satellite-map" style="width:100%;height:100%"></div></div>
+                        <div class="box traffic"><div id="print-traffic-map" style="width:100%;height:100%"></div></div>
+                    </div>
+                    <div class="box info-box">
+                        <table>
+                            <tr><td>نام:</td><td id="print-name">---</td></tr>
+                            <tr><td>نام خانوادگی:</td><td id="print-lastname">---</td></tr>
+                            <tr><td>کد ملی:</td><td id="print-nationalcode">---</td></tr>
+                            <tr><td>نام پدر:</td><td id="print-fathername">---</td></tr>
+                            <tr><td>پلاک اصلی:</td><td id="print-main-plate">---</td></tr>
+                            <tr><td>پلاک فرعی:</td><td id="print-sub-plate">---</td></tr>
+                            <tr><td>بخش:</td><td id="print-bakhsh">---</td></tr>
+                            <tr><td>منطقه:</td><td id="print-region">---</td></tr>
+                            <tr><td>مساحت:</td><td><span id="print-area">---</span> متر مربع</td></tr>
+                        </table>
+                        <div class="box desc" id="print-desc">&nbsp;</div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="print-section">
-                <h3>نمای ماهواره‌ای</h3>
-                <div class="print-satellite" id="print-satellite"></div>
-            </div>
-            
-            <div class="print-section">
-                <h3>وضعیت ترافیک</h3>
-                <div class="print-traffic" id="print-traffic"></div>
+
+            <div class="footer">
+                <div>مسئول نقشه‌بردار</div>
+                <div>مسئول یگان حفاظت</div>
             </div>
         </div>
     </div>
@@ -1056,32 +1016,83 @@
         }
         
         // تولید خروجی نهایی برای چاپ
-        function generateOutput() {
-            // پر کردن اطلاعات در فرم چاپ
-            document.getElementById('print-fullname').textContent = document.getElementById('fullname').value;
-            document.getElementById('print-fathername').textContent = document.getElementById('fathername').value;
-            document.getElementById('print-nationalcode').textContent = document.getElementById('nationalcode').value;
-            document.getElementById('print-region').textContent = document.getElementById('region').value;
-            document.getElementById('print-main-plate').textContent = document.getElementById('main-plate').value;
-            document.getElementById('print-sub-plate').textContent = document.getElementById('sub-plate').value || '-';
-            document.getElementById('print-area').textContent = document.getElementById('area').value;
-            
-            // پر کردن جدول مختصات
-            const coordsTable = document.getElementById('coordinates-table');
-            coordsTable.innerHTML = '';
-            
-            points.forEach((point, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${point.lng.toFixed(6)}</td>
-                    <td>${point.lat.toFixed(6)}</td>
-                `;
-                coordsTable.appendChild(row);
-            });
-            
-            // چاپ سند
-            window.print();
+        async function generatePrintView() {
+            try {
+                // نمایش خروجی چاپ برای استفاده در window.print
+                const printRoot = document.getElementById('print-output');
+                printRoot.style.display = 'block';
+
+                // پر کردن اطلاعات فرم در قالب جدید
+                const fullName = document.getElementById('fullname').value.trim();
+                const fatherName = document.getElementById('fathername').value.trim();
+                const nationalCode = document.getElementById('nationalcode').value.trim();
+                const region = document.getElementById('region').value.trim();
+                const mainPlate = document.getElementById('main-plate').value.trim();
+                const subPlate = document.getElementById('sub-plate').value.trim();
+                const areaVal = document.getElementById('area').value.trim();
+
+                // تفکیک نام و نام خانوادگی
+                const nameParts = fullName.split(' ');
+                const lastName = nameParts.pop() || '';
+                const firstName = nameParts.join(' ');
+
+                document.getElementById('print-name').textContent = firstName || '-';
+                document.getElementById('print-lastname').textContent = lastName || '-';
+                document.getElementById('print-fathername').textContent = fatherName || '-';
+                document.getElementById('print-nationalcode').textContent = nationalCode || '-';
+                document.getElementById('print-region').textContent = region || '-';
+                document.getElementById('print-main-plate').textContent = mainPlate || '-';
+                document.getElementById('print-sub-plate').textContent = subPlate || '-';
+                document.getElementById('print-area').textContent = areaVal || '-';
+
+                // تولید جدول UTM با استفاده از کتابخانه utm
+                const utmBody = document.getElementById('utm-table');
+                utmBody.innerHTML = '';
+                const zone = parseInt(document.getElementById('zone').value || '39', 10);
+                const hemisphere = document.getElementById('hemisphere').value === 'south' ? 'S' : 'N';
+                const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+                points.forEach((p, idx) => {
+                    try {
+                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone);
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${letters[idx] || idx+1}</td><td>${utmCoord.easting.toFixed(2)}</td><td>${utmCoord.northing.toFixed(2)}</td>`;
+                        utmBody.appendChild(tr);
+                    } catch (e) {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${letters[idx] || idx+1}</td><td>-</td><td>-</td>`;
+                        utmBody.appendChild(tr);
+                    }
+                });
+
+                // رندر نقشه‌ها در قالب چاپ
+                function renderLeafletStatic(divId, baseLayer) {
+                    const container = document.getElementById(divId);
+                    container.innerHTML = '';
+                    const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+                    baseLayer.addTo(m);
+                    if (polygon) {
+                        const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
+                        m.fitBounds(pg.getBounds(), { padding: [10,10] });
+                    } else if (points.length) {
+                        const pl = L.polyline(points, { color: '#000', weight: 2 }).addTo(m);
+                        m.fitBounds(pl.getBounds(), { padding: [10,10] });
+                    } else if (currentLocation) {
+                        m.setView(currentLocation.latlng, 16);
+                    }
+                    return m;
+                }
+
+                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
+                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'));
+                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', { subdomains: ['mt0','mt1','mt2','mt3'] }));
+
+                // چاپ
+                setTimeout(() => { window.print(); }, 250);
+
+            } catch (err) {
+                console.error(err);
+                alert('خطا در آماده‌سازی خروجی چاپ');
+            }
         }
         
         // تولید خروجی PDF
@@ -1322,7 +1333,7 @@ EOF
             document.getElementById('map-data-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 document.getElementById('data-modal').style.display = 'none';
-                await generatePDF();
+                await generatePrintView();
                 this.reset();
             });
             
