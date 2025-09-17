@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نرم افزار نقشه برداری GPS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <style>
+        :root {
+            --primary-color: #ff7700;
+            --secondary-color: #000;
+            --accent-color: #ffaa00;
+            --text-color: #fff;
+            --glow-color: rgba(255, 119, 0, 0.7);
+            --dark-bg: #111;
+            --card-bg: #1a1a1a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(255, 119, 0, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(255, 119, 0, 0.1) 0%, transparent 20%);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-bottom: 2px solid var(--primary-color);
+            box-shadow: 0 0 15px var(--glow-color);
+            border-radius: 10px;
+            background: var(--card-bg);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color), var(--primary-color));
+            border-radius: 5px;
+            filter: blur(5px);
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-shadow: 0 0 10px var(--glow-color);
+            margin-bottom: 10px;
+            font-size: 2.2rem;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .map-container {
+            position: relative;
+            height: 500px;
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px var(--glow-color);
+            background: var(--dark-bg);
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+        
+        .layer-control {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .layer-control button {
+            background: var(--secondary-color);
+            color: var(--text-color);
+            border: 1px solid var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        
+        .layer-control button:hover, .layer-control button.active {
+            background: var(--primary-color);
+            box-shadow: 0 0 10px var(--glow-color);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 10px;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 0 15px var(--glow-color);
+        }
+        
+        .btn {
+            background: linear-gradient(to bottom, #333, #222);
+            color: var(--text-color);
+            border: 2px solid var(--primary-color);
+            padding: 12px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5), 
+                        0 0 10px var(--glow-color),
+                        inset 0 0 5px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            transform: translateY(0);
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color), var(--primary-color));
+            z-index: -1;
+            border-radius: 60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), 
+                        0 0 15px var(--glow-color),
+                        inset 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:hover::before {
+            opacity: 0.3;
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), 
+                        0 0 5px var(--glow-color),
+                        inset 0 0 5px rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(to bottom, var(--primary-color), #e55d00);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(to bottom, #444, #2a2a2a);
+        }
+        
+        .gps-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: var(--card-bg);
+            border-radius: 10px;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 0 10px var(--glow-color);
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .coordinates, .satellite-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+        
+        .satellite-icon {
+            color: var(--primary-color);
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px var(--glow-color));
+        }
+        
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 20px;
+        }
+        
+        .signal-bar {
+            width: 4px;
+            background: var(--primary-color);
+            border-radius: 1px;
+        }
+        
+        .signal-bar:nth-child(1) { height: 5px; }
+        .signal-bar:nth-child(2) { height: 10px; }
+        .signal-bar:nth-child(3) { height: 15px; }
+        .signal-bar:nth-child(4) { height: 20px; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 0 30px var(--glow-color);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--primary-color);
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .close-modal:hover {
+            background: rgba(255, 119, 0, 0.2);
+            box-shadow: 0 0 10px var(--glow-color);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #222;
+            color: var(--text-color);
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px var(--glow-color);
+        }
+        
+        /* استایل برای خروجی چاپ */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-container, .print-container * {
+                visibility: visible;
+            }
+            .print-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 0;
+                margin: 0;
+            }
+            
+            .print-output {
+                width: 21cm;
+                height: 29.7cm;
+                padding: 1cm;
+                margin: 0;
+                box-sizing: border-box;
+                background: white;
+                color: black;
+                font-family: Arial, sans-serif;
+            }
+            
+            .print-map {
+                width: 100%;
+                height: 200px;
+                background: #f0f0f0;
+                margin-bottom: 10px;
+                border: 1px solid #ccc;
+            }
+            
+            .print-section {
+                margin-bottom: 15px;
+            }
+            
+            .print-flex {
+                display: flex;
+                gap: 15px;
+            }
+            
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+            }
+            
+            .print-table, .print-table th, .print-table td {
+                border: 1px solid #ccc;
+            }
+            
+            .print-table th, .print-table td {
+                padding: 8px;
+                text-align: center;
+            }
+            
+            .print-info {
+                flex: 1;
+                border: 1px solid #ccc;
+                padding: 10px;
+            }
+            
+            .print-satellite, .print-traffic {
+                height: 150px;
+                background: #f0f0f0;
+                border: 1px solid #ccc;
+                margin-bottom: 15px;
+            }
+        }
+        
+        /* انیمیشن‌ها */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px var(--glow-color); }
+            50% { box-shadow: 0 0 20px var(--glow-color); }
+            100% { box-shadow: 0 0 10px var(--glow-color); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes glow {
+            0% { text-shadow: 0 0 5px var(--glow-color); }
+            50% { text-shadow: 0 0 15px var(--glow-color); }
+            100% { text-shadow: 0 0 5px var(--glow-color); }
+        }
+        
+        .glow {
+            animation: glow 2s infinite;
+        }
+        
+        /* استایل برای دکمه‌های سه بعدی */
+        .btn-3d {
+            transition: all 0.1s;
+            transform: translateY(0);
+        }
+        
+        .btn-3d:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 5px var(--glow-color);
+        }
+        
+        /* نمایش پیش‌نمایش نقشه */
+        .map-preview {
+            height: 200px;
+            background-color: #f0f0f0;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+        }
+        
+        /* پاورقی */
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 15px;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #333;
+        }
+        
+        /* اسکلت بار برای loading */
+        .skeleton {
+            background: linear-gradient(90deg, #222 25%, #333 50%, #222 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* responsive design */
+        @media (max-width: 768px) {
+            .gps-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+        
+        /* نوار وضعیت PWA */
+        #pwa-install {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 15px var(--glow-color);
+            z-index: 1000;
+            display: none;
+        }
+        
+        #pwa-install button {
+            margin-left: 10px;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            background: var(--primary-color);
+            color: #000;
+            border: none;
+            font-weight: bold;
+        }
+        
+        #pwa-install button:last-child {
+            background: #444;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>نرم افزار نقشه برداری GPS</h1>
+            <p>برداشت نقاط، ترسیم پلی‌گون و تولید گزارش چاپی</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="layer-control">
+                    <button id="satellite-layer" class="active">ماهواره‌ای</button>
+                    <button id="street-layer">نقشه</button>
+                    <button id="traffic-layer">ترافیک</button>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="capture-point" class="btn btn-primary btn-3d"><i class="fas fa-map-marker-alt"></i> برداشت نقطه</button>
+                <button id="draw-mode" class="btn btn-secondary btn-3d"><i class="fas fa-pencil-alt"></i> ترسیم</button>
+                <button id="finish-polygon" class="btn btn-secondary" disabled><i class="fas fa-check-circle"></i> اتمام</button>
+                <button id="review-data" class="btn btn-secondary" disabled><i class="fas fa-clipboard-check"></i> بررسی</button>
+                <button id="export-pdf" class="btn btn-secondary" disabled><i class="fas fa-file-pdf"></i> خروجی PDF</button>
+                <button id="export-kmz" class="btn btn-secondary" disabled><i class="fas fa-file-archive"></i> خروجی KMZ</button>
+                <button id="export-dxf" class="btn btn-secondary" disabled><i class="fas fa-file-code"></i> خروجی DXF</button>
+                <button id="settings" class="btn btn-secondary"><i class="fas fa-cog"></i> تنظیمات</button>
+            </div>
+            
+            <div class="gps-info">
+                <div class="coordinates">
+                    <div class="info-item">
+                        <span>طول:</span>
+                        <span id="longitude" class="glow">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>عرض:</span>
+                        <span id="latitude" class="glow">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>دقت:</span>
+                        <span id="accuracy">0</span>
+                        <span>متر</span>
+                    </div>
+                </div>
+                <div class="satellite-info">
+                    <div class="info-item">
+                        <span class="satellite-icon"><i class="fas fa-satellite"></i></span>
+                        <span>ماهواره‌ها:</span>
+                        <span id="satellite-count">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>سیگنال:</span>
+                        <div class="signal-bars">
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- مودال تنظیمات -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>تنظیمات سیستم</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="coordinate-system">سیستم مختصات:</label>
+                <select id="coordinate-system" class="form-control">
+                    <option value="wgs84">WGS84 (طول و عرض جغرافیایی)</option>
+                    <option value="utm">UTM</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="zone">Zone:</label>
+                <input type="number" id="zone" value="39" min="1" max="60">
+            </div>
+            <div class="form-group">
+                <label for="hemisphere">نیمکره:</label>
+                <select id="hemisphere" class="form-control">
+                    <option value="north">شمالی</option>
+                    <option value="south">جنوبی</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="gps-mode">حالت دقت GPS:</label>
+                <select id="gps-mode" class="form-control">
+                    <option value="high">دقت بالا (مصرف باتری بیشتر)</option>
+                    <option value="low">دقت معمولی</option>
+                </select>
+            </div>
+            <button id="save-settings" class="btn btn-primary">ذخیره تنظیمات</button>
+        </div>
+    </div>
+    
+    <!-- مودال فرم اطلاعات -->
+    <div id="data-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>فرم اطلاعات نقشه</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="map-data-form">
+                <div class="form-group">
+                    <label for="fullname">نام و نام خانوادگی:</label>
+                    <input type="text" id="fullname" required>
+                </div>
+                <div class="form-group">
+                    <label for="fathername">نام پدر:</label>
+                    <input type="text" id="fathername" required>
+                </div>
+                <div class="form-group">
+                    <label for="nationalcode">کد ملی:</label>
+                    <input type="text" id="nationalcode" required pattern="[0-9]{10}">
+                </div>
+                <div class="form-group">
+                    <label for="region">منطقه (شهر/بخش):</label>
+                    <input type="text" id="region" required>
+                </div>
+                <div class="form-group">
+                    <label for="main-plate">پلاک اصلی:</label>
+                    <input type="text" id="main-plate" required>
+                </div>
+                <div class="form-group">
+                    <label for="sub-plate">پلاک فرعی:</label>
+                    <input type="text" id="sub-plate">
+                </div>
+                <div class="form-group">
+                    <label for="area">مساحت (متر مربع):</label>
+                    <input type="text" id="area" readonly>
+                </div>
+                <div class="form-group">
+                    <label>پیش‌نمایش نقشه:</label>
+                    <div id="map-preview" class="map-preview"></div>
+                </div>
+                <button type="submit" class="btn btn-primary">ثبت اطلاعات و تولید خروجی</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- بخش چاپ -->
+    <div id="print-output" class="print-container">
+        <div class="print-output">
+            <h2 style="text-align: center; margin-bottom: 15px;">گزارش نقشه برداری</h2>
+            
+            <div class="print-flex">
+                <div style="flex: 2;">
+                    <div class="print-map" id="print-map"></div>
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>ردیف</th>
+                                <th>طول جغرافیایی (X)</th>
+                                <th>عرض جغرافیایی (Y)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="coordinates-table">
+                            <!-- مختصات نقاط اینجا نمایش داده می‌شود -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="print-info">
+                    <h3>اطلاعات ثبتی</h3>
+                    <p><strong>نام و نام خانوادگی:</strong> <span id="print-fullname"></span></p>
+                    <p><strong>نام پدر:</strong> <span id="print-fathername"></span></p>
+                    <p><strong>کد ملی:</strong> <span id="print-nationalcode"></span></p>
+                    <p><strong>منطقه:</strong> <span id="print-region"></span></p>
+                    <p><strong>پلاک اصلی:</strong> <span id="print-main-plate"></span></p>
+                    <p><strong>پلاک فرعی:</strong> <span id="print-sub-plate"></span></p>
+                    <p><strong>مساحت:</strong> <span id="print-area"></span> متر مربع</p>
+                </div>
+            </div>
+            
+            <div class="print-section">
+                <h3>نمای ماهواره‌ای</h3>
+                <div class="print-satellite" id="print-satellite"></div>
+            </div>
+            
+            <div class="print-section">
+                <h3>وضعیت ترافیک</h3>
+                <div class="print-traffic" id="print-traffic"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>نرم افزار نقشه برداری GPS - نسخه 1.0</p>
+    </footer>
+
+    <div id="pwa-install">
+        <span>نرم افزار را روی دستگاه خود نصب کنید</span>
+        <button id="install-pwa-btn">نصب</button>
+        <button id="dismiss-pwa-btn">بعداً</button>
+    </div>
+
+    <!-- بارگذاری کتابخانه‌های مورد نیاز -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tokml/0.3.0/tokml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/utm/1.1.1/utm.min.js"></script>
+
+    <script>
+        // متغیرهای global
+        let map, drawnItems, currentLocation, captureMode = false, drawMode = false;
+        let points = [], satelliteCount = 0, polyline = null, polygon = null;
+        let satelliteLayer, streetLayer, trafficLayer;
+        let watchId = null;
+        let deferredPrompt;
+        
+        // مقداردهی اولیه نقشه
+        function initMap() {
+            // ایجاد نقشه
+            map = L.map('map', {
+                center: [35.6892, 51.3890], // مختصات تهران
+                zoom: 15,
+                zoomControl: false
+            });
+            
+            // افزودن کنترل zoom به گوشه پایین راست
+            L.control.zoom({
+                position: 'bottomright'
+            }).addTo(map);
+            
+            // افزودن لایه‌های مختلف
+            streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            });
+            
+            satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri',
+                maxZoom: 19
+            }).addTo(map);
+            
+            trafficLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', {
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google',
+                maxZoom: 19
+            });
+            
+            // ایجاد لایه برای اشیاء ترسیمی
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            // ردیابی موقعیت کاربر
+            startWatchingLocation();
+            
+            // افزودن کنترل scale
+            L.control.scale({imperial: false}).addTo(map);
+            
+            // بارگذاری داده‌های ذخیره شده
+            loadSavedData();
+        }
+        
+        // بارگذاری داده‌های ذخیره شده
+        async function loadSavedData() {
+            try {
+                const savedData = await localforage.getItem('gpsMapperData');
+                if (savedData && savedData.points && savedData.points.length > 0) {
+                    points = savedData.points.map(p => L.latLng(p.lat, p.lng));
+                    
+                    // ترسیم مجدد نقاط و پلی‌گون
+                    points.forEach(point => {
+                        L.marker(point, {
+                            icon: L.divIcon({
+                                className: 'custom-marker',
+                                html: '<div style="background-color: var(--primary-color); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px var(--glow-color);"></div>',
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            })
+                        }).addTo(drawnItems);
+                    });
+                    
+                    if (points.length > 1) {
+                        polyline = L.polyline(points, {
+                            color: 'orange',
+                            weight: 3,
+                            dashArray: '5, 10'
+                        }).addTo(drawnItems);
+                    }
+                    
+                    if (points.length >= 3) {
+                        document.getElementById('finish-polygon').disabled = false;
+                        polygon = L.polygon(points, {
+                            color: 'red',
+                            weight: 3,
+                            fillColor: 'rgba(255, 0, 0, 0.2)'
+                        }).addTo(drawnItems);
+                        
+                        // محاسبه مساحت
+                        const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+                        document.getElementById('area').value = area.toFixed(2) + ' متر مربع';
+                        
+                        document.getElementById('review-data').disabled = false;
+                        document.getElementById('export-pdf').disabled = false;
+                        document.getElementById('export-kmz').disabled = false;
+                        document.getElementById('export-dxf').disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('خطا در بارگذاری داده‌های ذخیره شده:', error);
+            }
+        }
+        
+        // ذخیره داده‌ها
+        async function saveData() {
+            try {
+                const pointsData = points.map(p => ({ lat: p.lat, lng: p.lng }));
+                await localforage.setItem('gpsMapperData', { points: pointsData });
+            } catch (error) {
+                console.error('خطا در ذخیره داده‌ها:', error);
+            }
+        }
+        
+        // شروع ردیابی موقعیت
+        function startWatchingLocation() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            
+            const highAccuracy = document.getElementById('gps-mode').value === 'high';
+            
+            watchId = navigator.geolocation.watchPosition(
+                position => {
+                    handleLocationFound(position);
+                },
+                error => {
+                    handleLocationError(error);
+                },
+                {
+                    enableHighAccuracy: highAccuracy,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+        
+        // مدیریت موقعیت یافته شده
+        function handleLocationFound(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            currentLocation = {
+                latlng: L.latLng(lat, lng),
+                accuracy: accuracy
+            };
+            
+            // به‌روزرسانی مختصات در پنل اطلاعات
+            document.getElementById('longitude').textContent = lat.toFixed(6);
+            document.getElementById('latitude').textContent = lng.toFixed(6);
+            document.getElementById('accuracy').textContent = accuracy.toFixed(2);
+            
+            // شبیه‌سازی تعداد ماهواره‌ها و قدرت سیگنال
+            updateSatelliteInfo(accuracy);
+            
+            // اگر حالت برداشت فعال است، نقطه را اضافه کن
+            if (captureMode) {
+                addPoint(currentLocation.latlng);
+                captureMode = false;
+                document.getElementById('capture-point').classList.remove('pulse');
+            }
+        }
+        
+        // مدیریت خطای موقعیت‌یابی
+        function handleLocationError(error) {
+            let errorMsg;
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = "دسترسی به موقعیت مکانی رد شد";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = "اطلاعات موقعیت مکانی در دسترس نیست";
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = "دریافت موقعیت مکانی زمان‌بر شد";
+                    break;
+                default:
+                    errorMsg = "خطای ناشناخته رخ داد";
+            }
+            
+            alert('خطا در دریافت موقعیت: ' + errorMsg);
+        }
+        
+        // به‌روزرسانی اطلاعات ماهواره
+        function updateSatelliteInfo(accuracy) {
+            // شبیه‌سازی تعداد ماهواره‌ها بر اساس دقت
+            if (accuracy < 10) {
+                satelliteCount = Math.floor(Math.random() * 5) + 10; // 10-15
+            } else if (accuracy < 30) {
+                satelliteCount = Math.floor(Math.random() * 5) + 7; // 7-12
+            } else {
+                satelliteCount = Math.floor(Math.random() * 5) + 4; // 4-9
+            }
+            
+            document.getElementById('satellite-count').textContent = satelliteCount;
+            
+            // به‌روزرسانی نوارهای سیگنال
+            const signalBars = document.querySelectorAll('.signal-bar');
+            const signalStrength = Math.max(0, Math.min(4, Math.floor((20 - accuracy) / 5)));
+            
+            signalBars.forEach((bar, index) => {
+                if (index < signalStrength) {
+                    bar.style.background = 'var(--primary-color)';
+                    bar.style.boxShadow = '0 0 5px var(--glow-color)';
+                } else {
+                    bar.style.background = '#555';
+                    bar.style.boxShadow = 'none';
+                }
+            });
+        }
+        
+        // افزودن نقطه به نقشه
+        function addPoint(latlng) {
+            const marker = L.marker(latlng, {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: '<div style="background-color: var(--primary-color); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px var(--glow-color);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(drawnItems);
+            
+            points.push(latlng);
+            
+            // ذخیره داده‌ها
+            saveData();
+            
+            // اگر بیش از یک نقطه داریم، خطوط را وصل کن
+            if (points.length > 1) {
+                if (polyline) {
+                    map.removeLayer(polyline);
+                }
+                
+                polyline = L.polyline(points, {
+                    color: 'orange',
+                    weight: 3,
+                    dashArray: '5, 10'
+                }).addTo(drawnItems);
+                
+                // فعال کردن دکمه اتمام اگر حداقل ۳ نقطه داریم
+                if (points.length >= 3) {
+                    document.getElementById('finish-polygon').disabled = false;
+                }
+            }
+        }
+        
+        // تکمیل پلی‌گون
+        function finishPolygon() {
+            if (points.length < 3) {
+                alert('برای ایجاد پلی‌گون حداقل به ۳ نقطه نیاز است');
+                return;
+            }
+            
+            // بستن پلی‌گون با اتصال نقطه اول به آخر
+            if (polygon) {
+                map.removeLayer(polygon);
+            }
+            
+            polygon = L.polygon(points, {
+                color: 'red',
+                weight: 3,
+                fillColor: 'rgba(255, 0, 0, 0.2)'
+            }).addTo(drawnItems);
+            
+            // غیرفعال کردن دکمه‌ها و فعال کردن دکمه بررسی
+            document.getElementById('finish-polygon').disabled = true;
+            document.getElementById('review-data').disabled = false;
+            document.getElementById('export-pdf').disabled = false;
+            document.getElementById('export-kmz').disabled = false;
+            document.getElementById('export-dxf').disabled = false;
+            
+            // محاسبه مساحت
+            const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+            document.getElementById('area').value = area.toFixed(2) + ' متر مربع';
+            
+            // نمایش پیش‌نمایش در فرم
+            updateMapPreview();
+            
+            // ذخیره داده‌ها
+            saveData();
+        }
+        
+        // به‌روزرسانی پیش‌نمایش نقشه
+        function updateMapPreview() {
+            const previewDiv = document.getElementById('map-preview');
+            previewDiv.innerHTML = '';
+            
+            // ایجاد یک نقشه ساده برای پیش‌نمایش
+            const previewMap = L.map('map-preview', {
+                center: polygon.getBounds().getCenter(),
+                zoom: 15,
+                zoomControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                tap: false
+            });
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(previewMap);
+            
+            // اضافه کردن پلی‌گون به پیش‌نمایش
+            const previewPolygon = L.polygon(points, {
+                color: 'black',
+                weight: 2,
+                fillColor: 'rgba(0, 0, 0, 0.1)'
+            }).addTo(previewMap);
+            
+            // تنظیم محدوده نمایش
+            previewMap.fitBounds(previewPolygon.getBounds());
+        }
+        
+        // تولید خروجی نهایی برای چاپ
+        function generateOutput() {
+            // پر کردن اطلاعات در فرم چاپ
+            document.getElementById('print-fullname').textContent = document.getElementById('fullname').value;
+            document.getElementById('print-fathername').textContent = document.getElementById('fathername').value;
+            document.getElementById('print-nationalcode').textContent = document.getElementById('nationalcode').value;
+            document.getElementById('print-region').textContent = document.getElementById('region').value;
+            document.getElementById('print-main-plate').textContent = document.getElementById('main-plate').value;
+            document.getElementById('print-sub-plate').textContent = document.getElementById('sub-plate').value || '-';
+            document.getElementById('print-area').textContent = document.getElementById('area').value;
+            
+            // پر کردن جدول مختصات
+            const coordsTable = document.getElementById('coordinates-table');
+            coordsTable.innerHTML = '';
+            
+            points.forEach((point, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${point.lng.toFixed(6)}</td>
+                    <td>${point.lat.toFixed(6)}</td>
+                `;
+                coordsTable.appendChild(row);
+            });
+            
+            // چاپ سند
+            window.print();
+        }
+        
+        // تولید خروجی PDF
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            // اضافه کردن عنوان
+            doc.setFontSize(20);
+            doc.text('گزارش نقشه برداری', 105, 15, { align: 'center' });
+            
+            // اضافه کردن تاریخ
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('fa-IR');
+            doc.setFontSize(12);
+            doc.text(`تاریخ: ${dateStr}`, 105, 25, { align: 'center' });
+            
+            // اضافه کردن اطلاعات کاربر
+            doc.setFontSize(14);
+            doc.text('اطلاعات ثبتی', 20, 40);
+            doc.setFontSize(12);
+            doc.text(`نام و نام خانوادگی: ${document.getElementById('fullname').value}`, 20, 50);
+            doc.text(`نام پدر: ${document.getElementById('fathername').value}`, 20, 60);
+            doc.text(`کد ملی: ${document.getElementById('nationalcode').value}`, 20, 70);
+            doc.text(`منطقه: ${document.getElementById('region').value}`, 20, 80);
+            doc.text(`پلاک اصلی: ${document.getElementById('main-plate').value}`, 20, 90);
+            doc.text(`پلاک فرعی: ${document.getElementById('sub-plate').value || '-'}`, 20, 100);
+            doc.text(`مساحت: ${document.getElementById('area').value}`, 20, 110);
+            
+            // اضافه کردن جدول مختصات
+            doc.setFontSize(14);
+            doc.text('مختصات نقاط', 105, 125, { align: 'center' });
+            
+            let y = 135;
+            doc.setFontSize(10);
+            doc.text('ردیف', 40, y);
+            doc.text('طول جغرافیایی', 70, y);
+            doc.text('عرض جغرافیایی', 120, y);
+            
+            y += 7;
+            doc.line(20, y, 190, y);
+            
+            y += 7;
+            points.forEach((point, index) => {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+                
+                doc.text((index + 1).toString(), 40, y);
+                doc.text(point.lng.toFixed(6), 70, y);
+                doc.text(point.lat.toFixed(6), 120, y);
+                y += 7;
+            });
+            
+            // ذخیره فایل PDF
+            doc.save('گزارش_نقشه_برداری.pdf');
+        }
+        
+        // تولید خروجی KMZ
+        async function generateKMZ() {
+            // ایجاد ساختار KML
+            const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+<name>GPS Mapper Export</name>
+<Placemark>
+<name>Polygon</name>
+<Polygon>
+<outerBoundaryIs>
+<LinearRing>
+<coordinates>`;
+            
+            const kmlFooter = `</coordinates>
+</LinearRing>
+</outerBoundaryIs>
+</Polygon>
+</Placemark>
+</Document>
+</kml>`;
+            
+            // ایجاد مختصات
+            let coordinates = '';
+            points.forEach(point => {
+                coordinates += `${point.lng},${point.lat},0 `;
+            });
+            // اضافه کردن نقطه اول برای بستن پلیگون
+            coordinates += `${points[0].lng},${points[0].lat},0`;
+            
+            const kmlContent = kmlHeader + coordinates + kmlFooter;
+            
+            // ایجاد فایل ZIP (KMZ)
+            const zip = new JSZip();
+            zip.file("doc.kml", kmlContent);
+            
+            // تولید فایل KMZ
+            const kmzBlob = await zip.generateAsync({type:"blob"});
+            
+            // دانلود فایل
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(kmzBlob);
+            a.download = 'نقشه_برداری.kmz';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        
+        // تولید خروجی DXF
+        async function generateDXF() {
+            // ایجاد هدر فایل DXF
+            let dxfContent = `  0
+SECTION
+  2
+HEADER
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+`;
+            
+            // اضافه کردن پلی‌لاین
+            dxfContent += `  0
+LWPOLYLINE
+  5
+${Math.floor(Math.random() * 100000).toString()}
+  100
+AcDbEntity
+  8
+0
+  100
+AcDbPolyline
+  90
+${points.length}
+  70
+1
+`;
+            
+            // اضافه کردن نقاط
+            points.forEach(point => {
+                dxfContent += `  10
+${point.lng.toFixed(6)}
+  20
+${point.lat.toFixed(6)}
+`;
+            });
+            
+            // اضافه کردن فوتر فایل DXF
+            dxfContent += `  0
+ENDSEC
+  0
+EOF
+`;
+            
+            // ایجاد و دانلود فایل DXF
+            const blob = new Blob([dxfContent], { type: 'application/dxf' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'نقشه_برداری.dxf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        
+        // تنظیم رویدادها برای دکمه‌ها
+        function setupEventListeners() {
+            // دکمه برداشت نقطه
+            document.getElementById('capture-point').addEventListener('click', function() {
+                captureMode = true;
+                this.classList.add('pulse');
+                
+                if (!currentLocation) {
+                    alert('در حال دریافت موقعیت... لطفاً چند ثانیه صبر کنید');
+                } else {
+                    addPoint(currentLocation.latlng);
+                    captureMode = false;
+                    this.classList.remove('pulse');
+                }
+            });
+            
+            // دکمه ترسیم
+            document.getElementById('draw-mode').addEventListener('click', function() {
+                drawMode = !drawMode;
+                if (drawMode) {
+                    this.classList.add('btn-primary');
+                    map.on('click', handleMapClick);
+                    alert('حالت ترسیم فعال شد. روی نقشه کلیک کنید تا نقاط ایجاد شوند');
+                } else {
+                    this.classList.remove('btn-primary');
+                    map.off('click', handleMapClick);
+                }
+            });
+            
+            // دکمه اتمام
+            document.getElementById('finish-polygon').addEventListener('click', finishPolygon);
+            
+            // دکمه بررسی
+            document.getElementById('review-data').addEventListener('click', function() {
+                document.getElementById('data-modal').style.display = 'flex';
+            });
+            
+            // دکمه تنظیمات
+            document.getElementById('settings').addEventListener('click', function() {
+                document.getElementById('settings-modal').style.display = 'flex';
+            });
+            
+            // دکمه‌های خروجی
+            document.getElementById('export-pdf').addEventListener('click', generatePDF);
+            document.getElementById('export-kmz').addEventListener('click', generateKMZ);
+            document.getElementById('export-dxf').addEventListener('click', generateDXF);
+            
+            // دکمه‌های بستن مودال
+            document.querySelectorAll('.close-modal').forEach(button => {
+                button.addEventListener('click', function() {
+                    this.closest('.modal').style.display = 'none';
+                });
+            });
+            
+            // ثبت فرم اطلاعات
+            document.getElementById('map-data-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                generateOutput();
+                this.reset();
+                document.getElementById('data-modal').style.display = 'none';
+            });
+            
+            // ذخیره تنظیمات
+            document.getElementById('save-settings').addEventListener('click', function() {
+                startWatchingLocation();
+                alert('تنظیمات ذخیره شد');
+                document.getElementById('settings-modal').style.display = 'none';
+            });
+            
+            // مدیریت لایه‌ها
+            document.getElementById('satellite-layer').addEventListener('click', function() {
+                map.removeLayer(streetLayer);
+                map.removeLayer(trafficLayer);
+                satelliteLayer.addTo(map);
+                setActiveLayerButton(this);
+            });
+            
+            document.getElementById('street-layer').addEventListener('click', function() {
+                map.removeLayer(satelliteLayer);
+                map.removeLayer(trafficLayer);
+                streetLayer.addTo(map);
+                setActiveLayerButton(this);
+            });
+            
+            document.getElementById('traffic-layer').addEventListener('click', function() {
+                map.removeLayer(satelliteLayer);
+                map.removeLayer(streetLayer);
+                trafficLayer.addTo(map);
+                setActiveLayerButton(this);
+            });
+            
+            // مدیریت PWA
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                document.getElementById('pwa-install').style.display = 'block';
+            });
+            
+            document.getElementById('install-pwa-btn').addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        document.getElementById('pwa-install').style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                }
+            });
+            
+            document.getElementById('dismiss-pwa-btn').addEventListener('click', () => {
+                document.getElementById('pwa-install').style.display = 'none';
+            });
+        }
+        
+        // تنظیم دکمه لایه فعال
+        function setActiveLayerButton(button) {
+            document.querySelectorAll('.layer-control button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            button.classList.add('active');
+        }
+        
+        // مدیریت کلیک روی نقشه در حالت ترسیم
+        function handleMapClick(e) {
+            addPoint(e.latlng);
+        }
+        
+        // ثبت Service Worker
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('sw.js');
+                    console.log('Service Worker ثبت شد');
+                } catch (error) {
+                    console.error('خطا در ثبت Service Worker:', error);
+                }
+            }
+        }
+        
+        // مقداردهی اولیه برنامه
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            setupEventListeners();
+            registerServiceWorker();
+            
+            // بررسی پشتیبانی از Geolocation API
+            if (!navigator.geolocation) {
+                alert('مرورگر شما از Geolocation API پشتیبانی نمی‌کند');
+                return;
+            }
+            
+            // درخواست دسترسی به موقعیت‌یابی
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    console.log('دسترسی به موقعیت مکانی granted شد');
+                },
+                function(error) {
+                    alert('لطفاً دسترسی به موقعیت مکانی را允许 کنید تا برنامه به درستی کار کند');
+                }
+            );
+        });
+    </script>
+</body>
+</html>
