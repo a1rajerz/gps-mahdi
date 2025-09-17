@@ -386,7 +386,7 @@
             }
             
             .print-table, .print-table th, .print-table td {
-                border: 1px solid #ccc;
+                border: 1px solid #000;
             }
             
             .print-table th, .print-table td {
@@ -396,17 +396,20 @@
             
             .print-info {
                 flex: 1;
-                border: 1px solid #ccc;
+                border: 2px solid #000;
                 padding: 10px;
             }
             
             .print-satellite, .print-traffic {
                 height: 150px;
                 background: #f0f0f0;
-                border: 1px solid #ccc;
+                border: 2px solid #000;
                 margin-bottom: 15px;
             }
         }
+
+        /* پنهان کردن خروجی چاپ در حالت عادی */
+        .print-container { display: none; }
         
         /* انیمیشن‌ها */
         @keyframes pulse {
@@ -668,27 +671,33 @@
     <!-- بخش چاپ -->
     <div id="print-output" class="print-container">
         <div class="print-output">
-            <h2 style="text-align: center; margin-bottom: 15px;">گزارش نقشه برداری</h2>
-            
+            <h2 id="print-title" style="text-align: center; margin-bottom: 10px; font-weight: 800;">نقشه تصرفی یگان حفاظت شهرستان یزد</h2>
+
             <div class="print-flex">
                 <div style="flex: 2;">
-                    <div class="print-map" id="print-map"></div>
-                    <table class="print-table">
-                        <thead>
-                            <tr>
-                                <th>ردیف</th>
-                                <th>طول جغرافیایی (X)</th>
-                                <th>عرض جغرافیایی (Y)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="coordinates-table">
-                            <!-- مختصات نقاط اینجا نمایش داده می‌شود -->
-                        </tbody>
-                    </table>
+                    <div class="print-map" id="print-map" style="border: 3px solid #000;"></div>
+                    <div class="print-flex" style="gap: 10px; align-items: stretch; margin-top: 10px;">
+                        <div style="flex: 2;">
+                            <table class="print-table" style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>ردیف</th>
+                                        <th>طول جغرافیایی (X)</th>
+                                        <th>عرض جغرافیایی (Y)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="coordinates-table"></tbody>
+                            </table>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div class="print-satellite" id="print-satellite"></div>
+                            <div class="print-traffic" id="print-traffic"></div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <div class="print-info">
-                    <h3>اطلاعات ثبتی</h3>
+                    <h3 style="margin-top: 0;">اطلاعات ثبتی</h3>
                     <p><strong>نام و نام خانوادگی:</strong> <span id="print-fullname"></span></p>
                     <p><strong>نام پدر:</strong> <span id="print-fathername"></span></p>
                     <p><strong>کد ملی:</strong> <span id="print-nationalcode"></span></p>
@@ -698,15 +707,14 @@
                     <p><strong>مساحت:</strong> <span id="print-area"></span> متر مربع</p>
                 </div>
             </div>
-            
-            <div class="print-section">
-                <h3>نمای ماهواره‌ای</h3>
-                <div class="print-satellite" id="print-satellite"></div>
-            </div>
-            
-            <div class="print-section">
-                <h3>وضعیت ترافیک</h3>
-                <div class="print-traffic" id="print-traffic"></div>
+
+            <div class="print-flex" style="gap: 20px; margin-top: 15px; align-items: stretch;">
+                <div style="flex: 1; border-top: 2px solid #000; padding-top: 10px; text-align: center;">
+                    <strong>مسئول یگان حفاظت</strong>
+                </div>
+                <div style="flex: 1; border-top: 2px solid #000; padding-top: 10px; text-align: center;">
+                    <strong>نقشه‌بردار</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -1071,69 +1079,65 @@
                 coordsTable.appendChild(row);
             });
             
-            // چاپ سند
-            window.print();
+            // آماده‌سازی نماهای نقشه برای چاپ (اصلی، ماهواره‌ای، ترافیک)
+            (async () => {
+                async function snapshotMap(layerToShow, targetId) {
+                    [satelliteLayer, streetLayer, trafficLayer].forEach(l => { try { map.removeLayer(l); } catch(e){} });
+                    layerToShow.addTo(map);
+                    await new Promise(r => setTimeout(r, 400));
+                    const mapContainer = map.getContainer();
+                    const canvas = await html2canvas(mapContainer, {useCORS: true, backgroundColor: '#fff', scale: 2});
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const target = document.getElementById(targetId);
+                    target.style.backgroundImage = `url(${dataUrl})`;
+                    target.style.backgroundSize = 'cover';
+                    target.style.backgroundPosition = 'center';
+                    target.innerHTML = '';
+                }
+
+                const activeLayer = (function(){
+                    if (map.hasLayer(satelliteLayer)) return satelliteLayer;
+                    if (map.hasLayer(trafficLayer)) return trafficLayer;
+                    return streetLayer;
+                })();
+                await snapshotMap(activeLayer, 'print-map');
+                await snapshotMap(satelliteLayer, 'print-satellite');
+                await snapshotMap(trafficLayer, 'print-traffic');
+
+                window.print();
+            })();
         }
         
-        // تولید خروجی PDF
+        // تولید خروجی PDF از قالب چاپ A4
         async function generatePDF() {
+            // از قالب چاپی که همین حالا تولید می‌کنیم خروجی می‌گیریم
+            // جلوگیری از باز شدن دیالوگ پرینت هنگام آماده‌سازی تصاویر
+            const savedPrint = window.print;
+            window.print = () => {};
+            try {
+                await (async () => new Promise(resolve => { generateOutput(); setTimeout(resolve, 100); }))();
+            } finally {
+                window.print = savedPrint;
+            }
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
-            
-            // اضافه کردن عنوان
-            doc.setFontSize(20);
-            doc.text('گزارش نقشه برداری', 105, 15, { align: 'center' });
-            
-            // اضافه کردن تاریخ
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('fa-IR');
-            doc.setFontSize(12);
-            doc.text(`تاریخ: ${dateStr}`, 105, 25, { align: 'center' });
-            
-            // اضافه کردن اطلاعات کاربر
-            doc.setFontSize(14);
-            doc.text('اطلاعات ثبتی', 20, 40);
-            doc.setFontSize(12);
-            doc.text(`نام و نام خانوادگی: ${document.getElementById('fullname').value}`, 20, 50);
-            doc.text(`نام پدر: ${document.getElementById('fathername').value}`, 20, 60);
-            doc.text(`کد ملی: ${document.getElementById('nationalcode').value}`, 20, 70);
-            doc.text(`منطقه: ${document.getElementById('region').value}`, 20, 80);
-            doc.text(`پلاک اصلی: ${document.getElementById('main-plate').value}`, 20, 90);
-            doc.text(`پلاک فرعی: ${document.getElementById('sub-plate').value || '-'}`, 20, 100);
-            doc.text(`مساحت: ${document.getElementById('area').value}`, 20, 110);
-            
-            // اضافه کردن جدول مختصات
-            doc.setFontSize(14);
-            doc.text('مختصات نقاط', 105, 125, { align: 'center' });
-            
-            let y = 135;
-            doc.setFontSize(10);
-            doc.text('ردیف', 40, y);
-            doc.text('طول جغرافیایی', 70, y);
-            doc.text('عرض جغرافیایی', 120, y);
-            
-            y += 7;
-            doc.line(20, y, 190, y);
-            
-            y += 7;
-            points.forEach((point, index) => {
-                if (y > 270) {
-                    doc.addPage();
-                    y = 20;
-                }
-                
-                doc.text((index + 1).toString(), 40, y);
-                doc.text(point.lng.toFixed(6), 70, y);
-                doc.text(point.lat.toFixed(6), 120, y);
-                y += 7;
-            });
-            
-            // ذخیره فایل PDF
-            doc.save('گزارش_نقشه_برداری.pdf');
+            const printNode = document.querySelector('#print-output .print-output');
+            const canvas = await html2canvas(printNode, {useCORS: true, backgroundColor: '#fff', scale: 2});
+            const imgData = canvas.toDataURL('image/png');
+            const imgProps = doc.getImageProperties(imgData);
+            const pdfWidth = doc.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            doc.save('نقشه_تصرفی_یزد.pdf');
         }
         
         // تولید خروجی KMZ
         async function generateKMZ() {
+            if (!points || points.length < 3) {
+                alert('ابتدا پلی‌گون را تکمیل کنید سپس خروجی KMZ بگیرید');
+                return;
+            }
             // ایجاد ساختار KML
             const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -1182,6 +1186,10 @@
         
         // تولید خروجی DXF
         async function generateDXF() {
+            if (!points || points.length < 3) {
+                alert('ابتدا حداقل ۳ نقطه ثبت و پلی‌گون را کامل کنید');
+                return;
+            }
             // ایجاد هدر فایل DXF
             let dxfContent = `  0
 SECTION
@@ -1207,7 +1215,7 @@ AcDbEntity
   100
 AcDbPolyline
   90
-${points.length}
+${points.length + 1}
   70
 1
 `;
@@ -1220,6 +1228,12 @@ ${point.lng.toFixed(6)}
 ${point.lat.toFixed(6)}
 `;
             });
+            // تکرار نقطه اول برای بستن پلی‌لاین
+            dxfContent += `  10
+${points[0].lng.toFixed(6)}
+  20
+${points[0].lat.toFixed(6)}
+`;
             
             // اضافه کردن فوتر فایل DXF
             dxfContent += `  0
