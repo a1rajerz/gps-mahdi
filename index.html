@@ -375,7 +375,7 @@
         #result-view .inner { max-width: 1000px; margin: 20px auto; padding: 16px; }
         #result-view .card { background: var(--card-bg); border: 2px solid var(--primary-color); border-radius: 12px; padding: 16px; box-shadow: 0 0 20px var(--glow-color); }
         #result-image { width: 100%; height: auto; display: block; border: 1px solid #333; border-radius: 8px; background: #111; }
-        #result-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+        #result-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 12px; }
         #result-actions .btn { min-width: 140px; }
 
         /* نشانگر شمال برای خروجی تصویر */
@@ -723,6 +723,19 @@
         </div>
     </div>
 
+    <!-- نمای فقط نتیجه برای نمایش پس از تولید نقشه -->
+    <div id="result-view">
+        <div class="inner">
+            <div class="card">
+                <img id="result-image" alt="نقشه تولید شده" />
+                <div id="result-actions">
+                    <a id="download-result" class="btn btn-primary" download="نقشه_A4.png">دانلود</a>
+                    <button id="back-to-main" class="btn btn-secondary">بازگشت به داشبورد</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <footer>
         <p>نرم افزار نقشه برداری GPS - نسخه 1.0</p>
     </footer>
@@ -1047,7 +1060,8 @@
             polygon = L.polygon(points, {
                 color: 'red',
                 weight: 3,
-                fillColor: 'rgba(255, 0, 0, 0.2)'
+                fillColor: '#ff0000',
+                fillOpacity: 0.25
             }).addTo(drawnItems);
             
             // غیرفعال کردن دکمه‌ها و فعال کردن دکمه بررسی
@@ -1133,7 +1147,7 @@
                 document.getElementById('print-main-plate').textContent = mainPlate || '-';
                 document.getElementById('print-sub-plate').textContent = subPlate || '-';
                 document.getElementById('print-area').textContent = areaVal || '-';
-                const descHtml = (dateVal ? `تاریخ: ${new Date(dateVal).toLocaleDateString('fa-IR')}\n` : '') + (descText || '');
+                const descHtml = (dateVal ? `تاریخ: ${dateVal}\n` : '') + (descText || '');
                 document.getElementById('print-desc').textContent = descHtml;
 
                 // تولید جدول UTM با استفاده از کتابخانه utm
@@ -1144,7 +1158,7 @@
                 const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
                 points.forEach((p, idx) => {
                     try {
-                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone);
+                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone, hemisphere !== 'S');
                         const tr = document.createElement('tr');
                         tr.innerHTML = `<td>${letters[idx] || idx+1}</td><td>${utmCoord.easting.toFixed(2)}</td><td>${utmCoord.northing.toFixed(2)}</td>`;
                         utmBody.appendChild(tr);
@@ -1461,10 +1475,6 @@ EOF
             // دکمه بررسی
             document.getElementById('review-data').addEventListener('click', function() {
                 document.getElementById('data-modal').style.display = 'flex';
-                const dateInput = document.getElementById('map-date');
-                if (dateInput && typeof dateInput.showPicker === 'function' && !dateInput.value) {
-                    setTimeout(() => dateInput.showPicker(), 100);
-                }
             });
             
             // دکمه تنظیمات
@@ -1495,21 +1505,7 @@ EOF
                 }
             });
             
-            // باز شدن خودکار تقویم تاریخ هنگام فوکوس
-            const mapDateInput = document.getElementById('map-date');
-            if (mapDateInput && typeof mapDateInput.showPicker === 'function') {
-                mapDateInput.addEventListener('focus', () => {
-                    if (!mapDateInput.value) { mapDateInput.showPicker(); }
-                });
-            }
-            
-            // کلیک روی توضیحات، اگر تاریخ خالی است، تقویم را باز کند
-            const descInput = document.getElementById('description');
-            if (descInput && mapDateInput && typeof mapDateInput.showPicker === 'function') {
-                descInput.addEventListener('click', () => {
-                    if (!mapDateInput.value) { mapDateInput.showPicker(); }
-                });
-            }
+            // حذف رفتار باز شدن خودکار تقویم؛ فقط با کلیک کاربر باز می‌شود
             
             // دکمه‌های بستن مودال
             document.querySelectorAll('.close-modal').forEach(button => {
@@ -1660,6 +1656,11 @@ EOF
                 buttonsColor: "orange",
                 forceFarsiDigits: true,
             });
+            // تنظیم مقدار پیش‌فرض تاریخ به امروز (شمسی)
+            const mapDateEl = document.getElementById('map-date');
+            if (mapDateEl && !mapDateEl.value) {
+                try { mapDateEl.value = new Date().toLocaleDateString('fa-IR'); } catch(e){}
+            }
             
             // بررسی پشتیبانی از Geolocation API
             if (!navigator.geolocation) {
@@ -1775,11 +1776,13 @@ EOF
                 row.style.border = '1px solid #333';
                 row.style.padding = '8px';
                 row.style.borderRadius = '8px';
+                const isJalali = typeof m.date === 'string' && /\d{4}\/\d{1,2}\/\d{1,2}/.test(m.date);
+                const dateLabel = m.date ? (isJalali ? m.date : new Date(m.date).toLocaleDateString('fa-IR')) : '-';
                 row.innerHTML = `
                     <img src="${m.image}" alt="thumb" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #222;" />
                     <div style="flex:1;">
                         <div style="font-weight:bold;color:var(--primary-color);">${m.title || 'بدون عنوان'}</div>
-                        <div style="font-size:12px;color:#ccc;">${(m.date ? new Date(m.date).toLocaleDateString('fa-IR') : '-') } | ${m.area || ''}</div>
+                        <div style="font-size:12px;color:#ccc;">${dateLabel} | ${m.area || ''}</div>
                     </div>
                     <div style="display:flex; gap:6px;">
                         <button class="btn btn-secondary" data-action="edit" data-id="${m.id}">ویرایش</button>
