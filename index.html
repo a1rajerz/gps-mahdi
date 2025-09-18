@@ -504,6 +504,7 @@
         /* Toast for non-blocking messages */
         #toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--primary-color); z-index: 4000; display: none; box-shadow: 0 0 12px var(--glow-color); }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/kamadatepicker/dist/kamadatepicker.min.css">
 </head>
 <body>
     <div class="container">
@@ -657,7 +658,7 @@
                 </div>
                 <div class="form-group">
                     <label for="map-date">تاریخ:</label>
-                    <input type="date" id="map-date" placeholder="انتخاب تاریخ" required>
+                    <input type="text" id="map-date" placeholder="برای انتخاب تاریخ کلیک کنید" required style="cursor: pointer;" readonly>
                 </div>
                 <div class="form-group">
                     <label for="description">توضیحات:</label>
@@ -737,6 +738,7 @@
     <!-- بارگذاری کتابخانه‌های مورد نیاز -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.3/dist/leaflet-geoman.min.js"></script>
+    <script src="https://unpkg.com/kamadatepicker/dist/kamadatepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1646,6 +1648,18 @@ EOF
             initMap();
             setupEventListeners();
             registerServiceWorker();
+
+            // Initialize kamadatepicker
+            kamaDatepicker('map-date', {
+                placeholder: 'برای انتخاب تاریخ کلیک کنید',
+                twodigit: true,
+                closeAfterSelect: true,
+                forceFarsiDigits: true,
+                markToday: true,
+                gotoToday: true,
+                buttonsColor: "orange",
+                forceFarsiDigits: true,
+            });
             
             // بررسی پشتیبانی از Geolocation API
             if (!navigator.geolocation) {
