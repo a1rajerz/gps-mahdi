@@ -603,7 +603,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="gps-mode">حالت دقت GPS:</label>
+                <label for="gps-mode">حوال دقت GPS:</label>
                 <select id="gps-mode" class="form-control">
                     <option value="high">دقت بالا (مصرف باتری بیشتر)</option>
                     <option value="low">دقت معمولی</option>
@@ -1152,7 +1152,7 @@
                 const descHtml = (dateVal ? `تاریخ: ${dateVal}\n` : '') + (descText || '');
                 document.getElementById('print-desc').textContent = descHtml;
 
-                // تولید جدول UTM با استفاده از کتابخانه utم (با تحمل خطا)
+                // تولید جدول UTM با استفاده از کتابخانه utm (با تحمل خطا)
                 const utmBody = document.getElementById('utm-table');
                 utmBody.innerHTML = '';
                 const zone = parseInt(document.getElementById('zone').value || '39', 10);
@@ -1163,57 +1163,79 @@
                     let easting = '-';
                     let northing = '-';
                     try {
-                        // تلاش اول: با zone و نیمکره مشخص
-                        const u1 = window.utm.fromLatLon(p.lat, p.lng, zone, isNorthern);
-                        easting = u1.easting.toFixed(2);
-                        northing = u1.northing.toFixed(2);
-                    } catch (e1) {
-                        try {
-                            // تلاش دوم: اجازه به کتابخانه برای تعیین zone
-                            const u2 = window.utm.fromLatLon(p.lat, p.lng);
-                            easting = u2.easting.toFixed(2);
-                            northing = u2.northing.toFixed(2);
-                        } catch (e2) {
-                            // در صورت شکست، مقادیر طول/عرض را نمایش می‌دهیم تا جدول خالی نماند
-                            easting = p.lng.toFixed(6);
-                            northing = p.lat.toFixed(6);
-                        }
+                        // تبدیل به UTM با zone و نیمکره مشخص
+                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone, isNorthern);
+                        easting = utmCoord.easting.toFixed(2);
+                        northing = utmCoord.northing.toFixed(2);
+                    } catch (e) {
+                        // در صورت شکست، مقادیر طول/عرض را نمایش می‌دهیم تا جدول خالی نماند
+                        easting = p.lng.toFixed(6);
+                        northing = p.lat.toFixed(6);
                     }
                     const tr = document.createElement('tr');
                     tr.innerHTML = `<td>${label}</td><td>${easting}</td><td>${northing}</td>`;
                     utmBody.appendChild(tr);
                 });
 
-                // رندر نقشه‌ها در قالب چاپ
+                // رندر نقشه‌ها در قالب چاپ - بهبود یافته برای قرارگیری پلیگون در مرکز
                 function renderLeafletStatic(divId, baseLayer) {
                     const container = document.getElementById(divId);
                     container.innerHTML = '';
-                    const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+                    
+                    const m = L.map(divId, { 
+                        zoomControl: false, 
+                        attributionControl: false, 
+                        dragging: false, 
+                        scrollWheelZoom: false, 
+                        doubleClickZoom: false, 
+                        boxZoom: false, 
+                        keyboard: false 
+                    });
+                    
                     baseLayer.addTo(m);
-                    let bounds = null;
+                    
+                    // اضافه کردن پلیگون به نقشه
                     if (points.length >= 3) {
-                        const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
-                        bounds = pg.getBounds();
+                        const pg = L.polygon(points, { 
+                            color: '#000', 
+                            weight: 2, 
+                            fillColor: 'rgba(0,0,0,0.1)' 
+                        }).addTo(m);
+                        
+                        // تنظیم محدوده نمایش برای قرارگیری پلیگون در مرکز
+                        const bounds = pg.getBounds();
+                        m.fitBounds(bounds, { padding: [10, 10] });
                     } else if (points.length) {
-                        const pl = L.polyline(points, { color: '#000', weight: 2 }).addTo(m);
-                        bounds = pl.getBounds();
+                        const pl = L.polyline(points, { 
+                            color: '#000', 
+                            weight: 2 
+                        }).addTo(m);
+                        
+                        const bounds = pl.getBounds();
+                        m.fitBounds(bounds, { padding: [10, 10] });
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
                     } else {
                         // Fallback view when there is no geometry or current GPS location
                         m.setView([35.6892, 51.3890], 13); // Tehran default
                     }
-                    // اطمینان از قرار گرفتن پلی‌گون در مرکز قاب پس از تعیین اندازه
-                    const fit = () => { if (bounds) m.fitBounds(bounds, { padding: [10,10] }); };
-                    fit();
-                    setTimeout(() => { m.invalidateSize(); fit(); }, 120);
-                    setTimeout(() => { fit(); }, 300);
+                    
+                    // اطمینان از نمایش صحیح پس از بارگذاری کامل
+                    setTimeout(() => {
+                        m.invalidateSize();
+                        if (points.length >= 3) {
+                            const pg = L.polygon(points).addTo(m);
+                            m.fitBounds(pg.getBounds(), { padding: [10, 10] });
+                            m.removeLayer(pg);
+                        }
+                    }, 100);
+                    
                     return m;
                 }
 
+                // رندر نقشه‌های مختلف
                 renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
                 renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }));
-                // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
                 renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
 
                 // تبدیل صفحه به تصویر A4 و دانلود
@@ -1846,3 +1868,4 @@ EOF
     </script>
 </body>
 </html>
+
