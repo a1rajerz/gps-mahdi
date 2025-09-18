@@ -370,6 +370,14 @@
             .print-container .page { width: 210mm; height: 297mm; }
         }
 
+        /* نمای نتیجه تولید نقشه */
+        #result-view { display:none; position: fixed; inset: 0; background: #000; z-index: 3000; overflow: auto; }
+        #result-view .inner { max-width: 1000px; margin: 20px auto; padding: 16px; }
+        #result-view .card { background: var(--card-bg); border: 2px solid var(--primary-color); border-radius: 12px; padding: 16px; box-shadow: 0 0 20px var(--glow-color); }
+        #result-image { width: 100%; height: auto; display: block; border: 1px solid #333; border-radius: 8px; background: #111; }
+        #result-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+        #result-actions .btn { min-width: 140px; }
+
         /* نشانگر شمال برای خروجی تصویر */
         .north-indicator { position: absolute; top: 6px; right: 8px; background: rgba(255,255,255,0.9); color: #000; border: 1px solid #000; border-radius: 6px; padding: 4px 6px; font-weight: bold; }
         
@@ -518,6 +526,7 @@
             </div>
             
             <div class="controls">
+                <button id="new-map" class="btn btn-secondary btn-3d"><i class="fas fa-plus"></i> نقشه جدید</button>
                 <button id="capture-point" class="btn btn-primary btn-3d"><i class="fas fa-map-marker-alt"></i> برداشت نقطه</button>
                 <button id="draw-mode" class="btn btn-secondary btn-3d"><i class="fas fa-pencil-alt"></i> ترسیم</button>
                 <button id="select-rect" class="btn btn-secondary btn-3d"><i class="fas fa-vector-square"></i> انتخاب</button>
@@ -599,6 +608,13 @@
                     <option value="low">دقت معمولی</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>نقشه‌های تولید شده:</label>
+                <div id="saved-maps-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                    <button id="delete-all-maps" class="btn btn-secondary" type="button">حذف همه</button>
+                </div>
+            </div>
             <button id="save-settings" class="btn btn-primary">ذخیره تنظیمات</button>
         </div>
     </div>
@@ -638,6 +654,14 @@
                 <div class="form-group">
                     <label for="area">مساحت (متر مربع):</label>
                     <input type="text" id="area" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="map-date">تاریخ:</label>
+                    <input type="date" id="map-date" placeholder="انتخاب تاریخ" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">توضیحات:</label>
+                    <input type="text" id="description" placeholder="توضیحات نقشه (تاریخ درج می‌شود)">
                 </div>
                 <div class="form-group">
                     <label>پیش‌نمایش نقشه:</label>
@@ -731,6 +755,7 @@
         let lastToastTime = 0;
         let selectionRect = null, selectedMarkerSet = new Set();
         let deleteMode = false, moveLastMode = false;
+        let lastGeneratedDataUrl = null;
         
         // مقداردهی اولیه نقشه
         function initMap() {
@@ -1090,6 +1115,8 @@
                 const mainPlate = document.getElementById('main-plate').value.trim();
                 const subPlate = document.getElementById('sub-plate').value.trim();
                 const areaVal = document.getElementById('area').value.trim();
+                const descText = document.getElementById('description') ? document.getElementById('description').value.trim() : '';
+                const dateVal = document.getElementById('map-date') ? document.getElementById('map-date').value : '';
 
                 // تفکیک نام و نام خانوادگی
                 const nameParts = fullName.split(' ');
@@ -1104,6 +1131,8 @@
                 document.getElementById('print-main-plate').textContent = mainPlate || '-';
                 document.getElementById('print-sub-plate').textContent = subPlate || '-';
                 document.getElementById('print-area').textContent = areaVal || '-';
+                const descHtml = (dateVal ? `تاریخ: ${new Date(dateVal).toLocaleDateString('fa-IR')}\n` : '') + (descText || '');
+                document.getElementById('print-desc').textContent = descHtml;
 
                 // تولید جدول UTM با استفاده از کتابخانه utm
                 const utmBody = document.getElementById('utm-table');
@@ -1153,12 +1182,21 @@
                 const pageEl = document.querySelector('#print-output .page');
                 const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
                 const dataURL = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = dataURL;
-                a.download = 'نقشه_A4.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                lastGeneratedDataUrl = dataURL;
+                await saveGeneratedMapRecord({
+                    id: 'map-' + Date.now(),
+                    title: fullName || 'نقشه بدون نام',
+                    date: dateVal || new Date().toISOString().slice(0,10),
+                    description: descText || '',
+                    region,
+                    mainPlate,
+                    subPlate,
+                    area: areaVal,
+                    points: points.map(p => ({ lat: p.lat, lng: p.lng })),
+                    image: dataURL,
+                    createdAt: new Date().toISOString()
+                });
+                showResultView(dataURL);
 
                 // پنهان‌سازی خروجی پس از تولید
                 setTimeout(() => { printRoot.style.display = 'none'; }, 200);
@@ -1344,6 +1382,12 @@ EOF
         
         // تنظیم رویدادها برای دکمه‌ها
         function setupEventListeners() {
+            // دکمه نقشه جدید
+            document.getElementById('new-map').addEventListener('click', function() {
+                clearMap();
+                showToast('نقشه جدید آماده ترسیم است');
+            });
+            
             // دکمه برداشت نقطه
             document.getElementById('capture-point').addEventListener('click', function() {
                 captureMode = true;
@@ -1415,11 +1459,16 @@ EOF
             // دکمه بررسی
             document.getElementById('review-data').addEventListener('click', function() {
                 document.getElementById('data-modal').style.display = 'flex';
+                const dateInput = document.getElementById('map-date');
+                if (dateInput && typeof dateInput.showPicker === 'function' && !dateInput.value) {
+                    setTimeout(() => dateInput.showPicker(), 100);
+                }
             });
             
             // دکمه تنظیمات
             document.getElementById('settings').addEventListener('click', function() {
                 document.getElementById('settings-modal').style.display = 'flex';
+                renderSavedMapsList();
             });
             
             // دکمه‌های خروجی
@@ -1443,6 +1492,22 @@ EOF
                     showToast('دریافت موقعیت ناموفق بود');
                 }
             });
+            
+            // باز شدن خودکار تقویم تاریخ هنگام فوکوس
+            const mapDateInput = document.getElementById('map-date');
+            if (mapDateInput && typeof mapDateInput.showPicker === 'function') {
+                mapDateInput.addEventListener('focus', () => {
+                    if (!mapDateInput.value) { mapDateInput.showPicker(); }
+                });
+            }
+            
+            // کلیک روی توضیحات، اگر تاریخ خالی است، تقویم را باز کند
+            const descInput = document.getElementById('description');
+            if (descInput && mapDateInput && typeof mapDateInput.showPicker === 'function') {
+                descInput.addEventListener('click', () => {
+                    if (!mapDateInput.value) { mapDateInput.showPicker(); }
+                });
+            }
             
             // دکمه‌های بستن مودال
             document.querySelectorAll('.close-modal').forEach(button => {
@@ -1587,6 +1652,139 @@ EOF
                 showToast('مرورگر شما از Geolocation API پشتیبانی نمی‌کند');
                 return;
             }
+        });
+
+        // مدیریت نمای نتیجه
+        function showResultView(dataUrl) {
+            try {
+                const container = document.querySelector('.container');
+                const result = document.getElementById('result-view');
+                const img = document.getElementById('result-image');
+                const dl = document.getElementById('download-result');
+                img.src = dataUrl;
+                dl.href = dataUrl;
+                if (container) container.style.display = 'none';
+                result.style.display = 'block';
+            } catch (e) { console.error(e); }
+        }
+
+        function hideResultView() {
+            const container = document.querySelector('.container');
+            const result = document.getElementById('result-view');
+            result.style.display = 'none';
+            if (container) container.style.display = 'block';
+        }
+
+        // پاکسازی کامل نقشه برای ترسیم جدید
+        function clearMap() {
+            if (pointMarkers && pointMarkers.length) {
+                pointMarkers.forEach(m => { try { drawnItems.removeLayer(m); } catch(e){} });
+            }
+            pointMarkers = [];
+            points = [];
+            if (polyline) { try { map.removeLayer(polyline); } catch(e){} polyline = null; }
+            if (polygon) { try { map.removeLayer(polygon); } catch(e){} polygon = null; }
+            if (selectionRect) { try { map.removeLayer(selectionRect); } catch(e){} selectionRect = null; }
+            selectedMarkerSet.clear();
+            document.getElementById('finish-polygon').disabled = true;
+            document.getElementById('review-data').disabled = true;
+            document.getElementById('export-pdf').disabled = true;
+            document.getElementById('export-kmz').disabled = true;
+            document.getElementById('export-dxf').disabled = true;
+            const areaInput = document.getElementById('area');
+            if (areaInput) areaInput.value = '';
+            const previewDiv = document.getElementById('map-preview');
+            if (previewDiv) previewDiv.innerHTML = '';
+            saveData();
+        }
+
+        // ذخیره و مدیریت آرشیو نقشه‌های تولید شده
+        async function getAllGeneratedMaps() {
+            try { return (await localforage.getItem('generatedMaps')) || []; } catch { return []; }
+        }
+
+        async function saveAllGeneratedMaps(maps) {
+            try { await localforage.setItem('generatedMaps', maps); } catch (e) { console.error(e); }
+        }
+
+        async function saveGeneratedMapRecord(record) {
+            const maps = await getAllGeneratedMaps();
+            maps.unshift(record);
+            await saveAllGeneratedMaps(maps);
+        }
+
+        async function deleteGeneratedMap(id) {
+            const maps = await getAllGeneratedMaps();
+            const next = maps.filter(m => m.id !== id);
+            await saveAllGeneratedMaps(next);
+            renderSavedMapsList();
+        }
+
+        async function deleteAllGeneratedMaps() {
+            await saveAllGeneratedMaps([]);
+            renderSavedMapsList();
+        }
+
+        async function editGeneratedMap(id) {
+            const maps = await getAllGeneratedMaps();
+            const idx = maps.findIndex(m => m.id === id);
+            if (idx < 0) return;
+            const current = maps[idx];
+            const newTitle = prompt('عنوان جدید را وارد کنید', current.title || '');
+            if (newTitle === null) return;
+            const newDate = prompt('تاریخ جدید (YYYY-MM-DD)', (current.date || '').slice(0,10));
+            if (newDate === null) return;
+            const newDesc = prompt('توضیحات', current.description || '');
+            if (newDesc === null) return;
+            maps[idx] = { ...current, title: newTitle, date: newDate, description: newDesc };
+            await saveAllGeneratedMaps(maps);
+            renderSavedMapsList();
+        }
+
+        async function renderSavedMapsList() {
+            const list = document.getElementById('saved-maps-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const maps = await getAllGeneratedMaps();
+            if (!maps.length) {
+                const empty = document.createElement('div');
+                empty.textContent = 'موردی ذخیره نشده است';
+                empty.style.color = '#bbb';
+                list.appendChild(empty);
+                return;
+            }
+            maps.forEach(m => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.gap = '10px';
+                row.style.alignItems = 'center';
+                row.style.border = '1px solid #333';
+                row.style.padding = '8px';
+                row.style.borderRadius = '8px';
+                row.innerHTML = `
+                    <img src="${m.image}" alt="thumb" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #222;" />
+                    <div style="flex:1;">
+                        <div style="font-weight:bold;color:var(--primary-color);">${m.title || 'بدون عنوان'}</div>
+                        <div style="font-size:12px;color:#ccc;">${(m.date ? new Date(m.date).toLocaleDateString('fa-IR') : '-') } | ${m.area || ''}</div>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-secondary" data-action="edit" data-id="${m.id}">ویرایش</button>
+                        <button class="btn btn-secondary" data-action="delete" data-id="${m.id}">حذف</button>
+                        <a class="btn btn-primary" href="${m.image}" download="نقشه_A4.png">دانلود</a>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        // رویدادهای نمای نتیجه و آرشیو
+        document.addEventListener('click', async function(ev) {
+            const t = ev.target;
+            if (!(t instanceof HTMLElement)) return;
+            if (t.id === 'back-to-main') { hideResultView(); }
+            if (t.id === 'delete-all-maps') { await deleteAllGeneratedMaps(); }
+            if (t.dataset && t.dataset.action === 'delete' && t.dataset.id) { await deleteGeneratedMap(t.dataset.id); }
+            if (t.dataset && t.dataset.action === 'edit' && t.dataset.id) { await editGeneratedMap(t.dataset.id); }
         });
     </script>
 </body>
