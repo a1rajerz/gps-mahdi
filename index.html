@@ -1183,6 +1183,9 @@
                         m.fitBounds(pl.getBounds(), { padding: [10,10] });
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
+                    } else {
+                        // Fallback view when there is no geometry or current GPS location
+                        m.setView([35.6892, 51.3890], 13); // Tehran default
                     }
                     setTimeout(() => m.invalidateSize(), 100);
                     return m;
@@ -1194,7 +1197,7 @@
                 renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
 
                 // تبدیل صفحه به تصویر A4 و دانلود
-                await new Promise(r => setTimeout(r, 600));
+                await new Promise(r => setTimeout(r, 1200));
                 const pageEl = document.querySelector('#print-output .page');
                 const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
                 const dataURL = canvas.toDataURL('image/png');
