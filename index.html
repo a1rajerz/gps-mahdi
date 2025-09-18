@@ -1185,36 +1185,47 @@
                 });
 
                 // رندر نقشه‌ها در قالب چاپ
-                function renderLeafletStatic(divId, baseLayer) {
+                function renderLeafletStatic(divId, baseLayer, forcedBounds) {
                     const container = document.getElementById(divId);
                     container.innerHTML = '';
                     const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
                     baseLayer.addTo(m);
-                    let bounds = null;
+                    let bounds = forcedBounds ? forcedBounds : null;
                     if (points.length >= 3) {
                         const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
-                        bounds = pg.getBounds();
+                        if (!bounds) bounds = pg.getBounds();
                     } else if (points.length) {
                         const pl = L.polyline(points, { color: '#000', weight: 2 }).addTo(m);
-                        bounds = pl.getBounds();
+                        if (!bounds) bounds = pl.getBounds();
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
                     } else {
                         // Fallback view when there is no geometry or current GPS location
                         m.setView([35.6892, 51.3890], 13); // Tehran default
                     }
-                    // اطمینان از قرار گرفتن پلی‌گون در مرکز قاب پس از تعیین اندازه
-                    const fit = () => { if (bounds) m.fitBounds(bounds, { padding: [10,10] }); };
+                    // اطمینان از قرار گرفتن پلی‌گون در مرکز قاب با محاسبه زوم مناسب
+                    const fit = () => {
+                        if (bounds) {
+                            const targetZoom = m.getBoundsZoom(bounds, true);
+                            const center = bounds.getCenter();
+                            m.setView(center, targetZoom);
+                        }
+                    };
                     fit();
                     setTimeout(() => { m.invalidateSize(); fit(); }, 120);
                     setTimeout(() => { fit(); }, 300);
                     return m;
                 }
 
-                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
-                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }));
+                // محاسبه یک bounds واحد از هندسه برای یکسان‌سازی قاب سه نقشه
+                let unifiedBounds = null;
+                if (points && points.length >= 2) {
+                    try { unifiedBounds = L.latLngBounds(points); } catch(e) {}
+                }
+                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
+                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }), unifiedBounds);
                 // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
-                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
+                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
 
                 // تبدیل صفحه به تصویر A4 و دانلود
                 await new Promise(r => setTimeout(r, 1200));
