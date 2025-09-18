@@ -2,13 +2,11 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نرم افزار نقشه برداری GPS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.3/dist/leaflet-geoman.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="assets/icon.png">
     <style>
         :root {
             --primary-color: #ff7700;
@@ -35,8 +33,6 @@
                 radial-gradient(circle at 10% 20%, rgba(255, 119, 0, 0.1) 0%, transparent 20%),
                 radial-gradient(circle at 90% 80%, rgba(255, 119, 0, 0.1) 0%, transparent 20%);
         }
-        /* عدم نمایش خروجی چاپ در حالت عادی */
-        #print-output { display: none; }
         
         .container {
             max-width: 1200px;
@@ -340,7 +336,6 @@
             box-shadow: 0 0 10px var(--glow-color);
         }
         
-        /* استایل پایه برای خروجی چاپ (برای رندر html2canvas در حالت screen) */
         .print-container { display: none; }
         .print-container .page {
             width: 210mm; height: 297mm; margin: auto; border: 3px solid #000; padding: 15px;
@@ -362,7 +357,6 @@
         .print-container .desc { margin-top: 10px; height: 60px; }
         .print-container .footer { display: flex; justify-content: space-between; margin-top: auto; font-size: 13px; font-weight: bold; }
 
-        /* استایل برای خروجی چاپ هنگام پرینت واقعی */
         @media print {
             body * { visibility: hidden; }
             .print-container, .print-container * { visibility: visible; }
@@ -370,7 +364,6 @@
             .print-container .page { width: 210mm; height: 297mm; }
         }
 
-        /* نمای نتیجه تولید نقشه */
         #result-view { display:none; position: fixed; inset: 0; background: #000; z-index: 3000; overflow: auto; }
         #result-view .inner { max-width: 1000px; margin: 20px auto; padding: 16px; }
         #result-view .card { background: var(--card-bg); border: 2px solid var(--primary-color); border-radius: 12px; padding: 16px; box-shadow: 0 0 20px var(--glow-color); }
@@ -378,10 +371,8 @@
         #result-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 12px; }
         #result-actions .btn { min-width: 140px; }
 
-        /* نشانگر شمال برای خروجی تصویر */
         .north-indicator { position: absolute; top: 6px; right: 8px; background: rgba(255,255,255,0.9); color: #000; border: 1px solid #000; border-radius: 6px; padding: 4px 6px; font-weight: bold; }
         
-        /* انیمیشن‌ها */
         @keyframes pulse {
             0% { box-shadow: 0 0 10px var(--glow-color); }
             50% { box-shadow: 0 0 20px var(--glow-color); }
@@ -402,7 +393,6 @@
             animation: glow 2s infinite;
         }
         
-        /* استایل برای دکمه‌های سه بعدی */
         .btn-3d {
             transition: all 0.1s;
             transform: translateY(0);
@@ -413,7 +403,6 @@
             box-shadow: 0 0 5px var(--glow-color);
         }
         
-        /* نمایش پیش‌نمایش نقشه */
         .map-preview {
             height: 200px;
             background-color: #f0f0f0;
@@ -421,7 +410,6 @@
             border: 1px solid #ccc;
         }
         
-        /* پاورقی */
         footer {
             text-align: center;
             margin-top: 30px;
@@ -431,7 +419,6 @@
             border-top: 1px solid #333;
         }
         
-        /* اسکلت بار برای loading */
         .skeleton {
             background: linear-gradient(90deg, #222 25%, #333 50%, #222 75%);
             background-size: 200% 100%;
@@ -444,7 +431,6 @@
             100% { background-position: -200% 0; }
         }
         
-        /* responsive design */
         @media (max-width: 768px) {
             body {
                 height: 100dvh;
@@ -463,7 +449,6 @@
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
             }
-            /* دکمه‌های دایره‌ای و بزرگ‌تر */
             .controls .btn {
                 width: 64px; height: 64px; padding: 0; border-radius: 50%; display: inline-flex;
                 align-items: center; justify-content: center; font-size: 0;
@@ -471,7 +456,6 @@
             .controls .btn i { font-size: 20px; margin: 0; }
         }
         
-        /* نوار وضعیت PWA */
         #pwa-install {
             position: fixed;
             bottom: 20px;
@@ -501,10 +485,8 @@
             color: #fff;
         }
 
-        /* Toast for non-blocking messages */
         #toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--primary-color); z-index: 4000; display: none; box-shadow: 0 0 12px var(--glow-color); }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/kamadatepicker/dist/kamadatepicker.min.css">
 </head>
 <body>
     <div class="container">
@@ -751,7 +733,7 @@
     <!-- بارگذاری کتابخانه‌های مورد نیاز -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.3/dist/leaflet-geoman.min.js"></script>
-    <script src="https://unpkg.com/kamadatepicker/dist/kamadatepicker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -922,7 +904,7 @@
                     errorMsg = "دسترسی به موقعیت مکانی رد شد";
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    errorMsg = "اطلاعات موقعیت مکانی در دسترس نیست";
+                    errorMsg = "정보 موقعیت مکانی در دسترس نیست";
                     break;
                 case error.TIMEOUT:
                     errorMsg = "دریافت موقعیت مکانی زمان‌بر شد";
@@ -1118,7 +1100,7 @@
             previewMap.fitBounds(previewPolygon.getBounds());
         }
         
-        // تولید خروجی نهایی برای چاپ
+        // تولید خروجی نهایی برای چاپ - نسخه اصلاح شده
         async function generatePrintView() {
             try {
                 // نمایش خروجی چاپ برای استفاده در window.print
@@ -1152,16 +1134,18 @@
                 const descHtml = (dateVal ? `تاریخ: ${dateVal}\n` : '') + (descText || '');
                 document.getElementById('print-desc').textContent = descHtml;
 
-                // تولید جدول UTM با استفاده از کتابخانه utm (با تحمل خطا)
+                // تولید جدول UTM با استفاده از کتابخانه utm
                 const utmBody = document.getElementById('utm-table');
                 utmBody.innerHTML = '';
                 const zone = parseInt(document.getElementById('zone').value || '39', 10);
                 const isNorthern = document.getElementById('hemisphere').value !== 'south';
                 const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+                
                 points.forEach((p, idx) => {
                     const label = letters[idx] || (idx + 1);
                     let easting = '-';
                     let northing = '-';
+                    
                     try {
                         // تبدیل به UTM با zone و نیمکره مشخص
                         const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone, isNorthern);
@@ -1172,6 +1156,7 @@
                         easting = p.lng.toFixed(6);
                         northing = p.lat.toFixed(6);
                     }
+                    
                     const tr = document.createElement('tr');
                     tr.innerHTML = `<td>${label}</td><td>${easting}</td><td>${northing}</td>`;
                     utmBody.appendChild(tr);
@@ -1244,6 +1229,7 @@
                 const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
                 const dataURL = canvas.toDataURL('image/png');
                 lastGeneratedDataUrl = dataURL;
+                
                 await saveGeneratedMapRecord({
                     id: 'map-' + Date.now(),
                     title: fullName || 'نقشه بدون نام',
@@ -1257,6 +1243,7 @@
                     image: dataURL,
                     createdAt: new Date().toISOString()
                 });
+                
                 showResultView(dataURL);
 
                 // پنهان‌سازی خروجی پس از تولید
@@ -1550,8 +1537,6 @@ EOF
                 }
             });
             
-            // حذف رفتار باز شدن خودکار تقویم؛ فقط با کلیک کاربر باز می‌شود
-            
             // دکمه‌های بستن مودال
             document.querySelectorAll('.close-modal').forEach(button => {
                 button.addEventListener('click', function() {
@@ -1603,6 +1588,7 @@ EOF
                 document.getElementById('pwa-install').style.display = 'block';
             });
             
+            document.getElementById('install-pwa-btn').add
             document.getElementById('install-pwa-btn').addEventListener('click', async () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
@@ -1868,4 +1854,5 @@ EOF
     </script>
 </body>
 </html>
+
 
