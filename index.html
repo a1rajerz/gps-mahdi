@@ -1063,6 +1063,8 @@
                 fillColor: '#ff0000',
                 fillOpacity: 0.25
             }).addTo(drawnItems);
+            // نمایش پلی‌گون در مرکز نقشه اصلی
+            try { map.fitBounds(polygon.getBounds(), { padding: [20,20] }); } catch(e) {}
             
             // غیرفعال کردن دکمه‌ها و فعال کردن دکمه بررسی
             document.getElementById('finish-polygon').disabled = true;
@@ -1150,23 +1152,36 @@
                 const descHtml = (dateVal ? `تاریخ: ${dateVal}\n` : '') + (descText || '');
                 document.getElementById('print-desc').textContent = descHtml;
 
-                // تولید جدول UTM با استفاده از کتابخانه utm
+                // تولید جدول UTM با استفاده از کتابخانه utم (با تحمل خطا)
                 const utmBody = document.getElementById('utm-table');
                 utmBody.innerHTML = '';
                 const zone = parseInt(document.getElementById('zone').value || '39', 10);
-                const hemisphere = document.getElementById('hemisphere').value === 'south' ? 'S' : 'N';
+                const isNorthern = document.getElementById('hemisphere').value !== 'south';
                 const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
                 points.forEach((p, idx) => {
+                    const label = letters[idx] || (idx + 1);
+                    let easting = '-';
+                    let northing = '-';
                     try {
-                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone, hemisphere !== 'S');
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `<td>${letters[idx] || idx+1}</td><td>${utmCoord.easting.toFixed(2)}</td><td>${utmCoord.northing.toFixed(2)}</td>`;
-                        utmBody.appendChild(tr);
-                    } catch (e) {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `<td>${letters[idx] || idx+1}</td><td>-</td><td>-</td>`;
-                        utmBody.appendChild(tr);
+                        // تلاش اول: با zone و نیمکره مشخص
+                        const u1 = window.utm.fromLatLon(p.lat, p.lng, zone, isNorthern);
+                        easting = u1.easting.toFixed(2);
+                        northing = u1.northing.toFixed(2);
+                    } catch (e1) {
+                        try {
+                            // تلاش دوم: اجازه به کتابخانه برای تعیین zone
+                            const u2 = window.utm.fromLatLon(p.lat, p.lng);
+                            easting = u2.easting.toFixed(2);
+                            northing = u2.northing.toFixed(2);
+                        } catch (e2) {
+                            // در صورت شکست، مقادیر طول/عرض را نمایش می‌دهیم تا جدول خالی نماند
+                            easting = p.lng.toFixed(6);
+                            northing = p.lat.toFixed(6);
+                        }
                     }
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${label}</td><td>${easting}</td><td>${northing}</td>`;
+                    utmBody.appendChild(tr);
                 });
 
                 // رندر نقشه‌ها در قالب چاپ
@@ -1175,19 +1190,24 @@
                     container.innerHTML = '';
                     const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
                     baseLayer.addTo(m);
-                    if (polygon) {
+                    let bounds = null;
+                    if (points.length >= 3) {
                         const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
-                        m.fitBounds(pg.getBounds(), { padding: [10,10] });
+                        bounds = pg.getBounds();
                     } else if (points.length) {
                         const pl = L.polyline(points, { color: '#000', weight: 2 }).addTo(m);
-                        m.fitBounds(pl.getBounds(), { padding: [10,10] });
+                        bounds = pl.getBounds();
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
                     } else {
                         // Fallback view when there is no geometry or current GPS location
                         m.setView([35.6892, 51.3890], 13); // Tehran default
                     }
-                    setTimeout(() => m.invalidateSize(), 100);
+                    // اطمینان از قرار گرفتن پلی‌گون در مرکز قاب پس از تعیین اندازه
+                    const fit = () => { if (bounds) m.fitBounds(bounds, { padding: [10,10] }); };
+                    fit();
+                    setTimeout(() => { m.invalidateSize(); fit(); }, 120);
+                    setTimeout(() => { fit(); }, 300);
                     return m;
                 }
 
@@ -1681,6 +1701,7 @@ EOF
                 const dl = document.getElementById('download-result');
                 img.src = dataUrl;
                 dl.href = dataUrl;
+                dl.download = 'نقشه_A4.png';
                 if (container) container.style.display = 'none';
                 result.style.display = 'block';
             } catch (e) { console.error(e); }
@@ -1802,6 +1823,22 @@ EOF
             const t = ev.target;
             if (!(t instanceof HTMLElement)) return;
             if (t.id === 'back-to-main') { hideResultView(); }
+            if (t.id === 'download-result') {
+                ev.preventDefault();
+                try {
+                    if (!lastGeneratedDataUrl) return;
+                    const response = await fetch(lastGeneratedDataUrl);
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'نقشه_A4.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) { console.error(e); }
+            }
             if (t.id === 'delete-all-maps') { await deleteAllGeneratedMaps(); }
             if (t.dataset && t.dataset.action === 'delete' && t.dataset.id) { await deleteGeneratedMap(t.dataset.id); }
             if (t.dataset && t.dataset.action === 'edit' && t.dataset.id) { await editGeneratedMap(t.dataset.id); }
