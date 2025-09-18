@@ -759,6 +759,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tokml/0.3.0/tokml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/utm/1.1.1/utm.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.10.0/proj4.min.js"></script>
 
     <script>
         // متغیرهای global
@@ -890,9 +891,23 @@
             if (document.getElementById('coordinate-system').value === 'utm') {
                 try {
                     const zone = parseInt(document.getElementById('zone').value || '39', 10);
-                    const utmCoord = window.utm.fromLatLon(lat, lng, zone);
-                    document.getElementById('longitude').textContent = utmCoord.easting.toFixed(2);
-                    document.getElementById('latitude').textContent = utmCoord.northing.toFixed(2);
+                    const isNorth = (document.getElementById('hemisphere').value !== 'south');
+                    let easting = null, northing = null;
+                    if (window.proj4) {
+                        const def = `+proj=utm +zone=${zone} ${isNorth ? '+north' : '+south'} +datum=WGS84 +units=m +no_defs`;
+                        const out = window.proj4('EPSG:4326', def, [lng, lat]);
+                        easting = out[0]; northing = out[1];
+                    } else if (window.utm && window.utm.fromLatLon) {
+                        const u = window.utm.fromLatLon(lat, lng, zone, isNorth);
+                        easting = u.easting; northing = u.northing;
+                    }
+                    if (easting != null && northing != null) {
+                        document.getElementById('longitude').textContent = easting.toFixed(2);
+                        document.getElementById('latitude').textContent = northing.toFixed(2);
+                    } else {
+                        document.getElementById('longitude').textContent = lat.toFixed(6);
+                        document.getElementById('latitude').textContent = lng.toFixed(6);
+                    }
                 } catch (e) {
                     document.getElementById('longitude').textContent = lat.toFixed(6);
                     document.getElementById('latitude').textContent = lng.toFixed(6);
@@ -1179,7 +1194,7 @@
                     const container = document.getElementById(divId);
                     container.innerHTML = '';
                     const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
-                    baseLayer.addTo(m);
+                    const bl = baseLayer.addTo(m);
                     let bounds = forcedBounds ? forcedBounds : null;
                     if (points.length >= 3) {
                         const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
@@ -1193,17 +1208,17 @@
                         // Fallback view when there is no geometry or current GPS location
                         m.setView([35.6892, 51.3890], 13); // Tehran default
                     }
-                    // اطمینان از قرار گرفتن پلی‌گون در مرکز قاب با محاسبه زوم مناسب
+                    // اطمینان از قرار گرفتن پلی‌گن در مرکز قاب با محاسبه زوم مناسب
                     const fit = () => {
-                        if (bounds) {
-                            const targetZoom = m.getBoundsZoom(bounds, true);
-                            const center = bounds.getCenter();
-                            m.setView(center, targetZoom);
-                        }
+                        if (!bounds) return;
+                        const targetZoom = m.getBoundsZoom(bounds, true);
+                        const center = bounds.getCenter();
+                        m.setView(center, targetZoom, { animate: false });
                     };
-                    fit();
-                    setTimeout(() => { m.invalidateSize(); fit(); }, 120);
-                    setTimeout(() => { fit(); }, 300);
+                    m.whenReady(() => { m.invalidateSize(); fit(); });
+                    bl.on('load', fit);
+                    setTimeout(fit, 200);
+                    setTimeout(fit, 500);
                     return m;
                 }
 
