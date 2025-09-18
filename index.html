@@ -1167,25 +1167,32 @@
                 const descHtml = (dateVal ? `تاریخ: ${dateVal}\n` : '') + (descText || '');
                 document.getElementById('print-desc').textContent = descHtml;
 
-                // تولید جدول UTM با استفاده از کتابخانه utم (با تحمل خطا)
+                // تولید جدول UTM 84 با Zone/North انتخابی (proj4 در اولویت، سپس utm)
                 const utmBody = document.getElementById('utm-table');
-                // از zone/hemisphere صرف نظر می‌کنیم تا خطاهای احتمالی حذف شود
+                const zone = parseInt(document.getElementById('zone').value || '39', 10);
+                const isNorth = (document.getElementById('hemisphere').value !== 'south');
                 const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
                 let rowsHtml = '';
                 (points || []).forEach((p, idx) => {
                     const label = letters[idx] || (idx + 1);
-                    let easting = '-';
-                    let northing = '-';
                     try {
-                        const utmCoord = window.utm.fromLatLon(p.lat, p.lng);
-                        easting = utmCoord.easting.toFixed(2);
-                        northing = utmCoord.northing.toFixed(2);
-                    } catch (e1) {
-                        // اگر کتابخانه خطا داد، حداقل طول/عرض نمایش داده می‌شود
-                        easting = (p && p.lng !== undefined) ? p.lng.toFixed(6) : '-';
-                        northing = (p && p.lat !== undefined) ? p.lat.toFixed(6) : '-';
+                        let easting, northing;
+                        if (window.proj4) {
+                            const def = `+proj=utm +zone=${zone} ${isNorth ? '+north' : '+south'} +datum=WGS84 +units=m +no_defs`;
+                            const out = window.proj4('EPSG:4326', def, [p.lng, p.lat]);
+                            easting = out[0];
+                            northing = out[1];
+                        } else if (window.utm && window.utm.fromLatLon) {
+                            const u = window.utm.fromLatLon(p.lat, p.lng, zone, isNorth);
+                            easting = u.easting;
+                            northing = u.northing;
+                        } else {
+                            throw new Error('no converter');
+                        }
+                        rowsHtml += `<tr><td>${label}</td><td>${easting.toFixed(2)}</td><td>${northing.toFixed(2)}</td></tr>`;
+                    } catch (e) {
+                        rowsHtml += `<tr><td>${label}</td><td>-</td><td>-</td></tr>`;
                     }
-                    rowsHtml += `<tr><td>${label}</td><td>${easting}</td><td>${northing}</td></tr>`;
                 });
                 utmBody.innerHTML = rowsHtml;
 
@@ -1227,13 +1234,20 @@
                 if (points && points.length >= 2) {
                     try { unifiedBounds = L.latLngBounds(points); } catch(e) {}
                 }
-                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
-                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }), unifiedBounds);
+                const m1 = renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
+                const m2 = renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }), unifiedBounds);
                 // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
-                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
+                const m3 = renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }), unifiedBounds);
+                const refitAll = () => {
+                    [m1,m2,m3].forEach(m => { try { if (unifiedBounds) { m.invalidateSize(); m.fitBounds(unifiedBounds, { padding: [12,12] }); } } catch(e){} });
+                };
+                refitAll();
+                setTimeout(refitAll, 400);
+                setTimeout(refitAll, 1000);
 
                 // تبدیل صفحه به تصویر A4 و دانلود (تاخیر بیشتر برای بارگذاری کامل)
-                await new Promise(r => setTimeout(r, 2000));
+                refitAll();
+                await new Promise(r => setTimeout(r, 2400));
                 const pageEl = document.querySelector('#print-output .page');
                 const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
                 const dataURL = canvas.toDataURL('image/png');
