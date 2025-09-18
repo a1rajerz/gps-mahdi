@@ -895,7 +895,7 @@
                     let easting = null, northing = null;
                     if (window.proj4) {
                         const def = `+proj=utm +zone=${zone} ${isNorth ? '+north' : '+south'} +datum=WGS84 +units=m +no_defs`;
-                        const out = window.proj4('EPSG:4326', def, [lng, lat]);
+                        const out = window.proj4('WGS84', def, [lng, lat]);
                         easting = out[0]; northing = out[1];
                     } else if (window.utm && window.utm.fromLatLon) {
                         const u = window.utm.fromLatLon(lat, lng, zone, isNorth);
@@ -1179,7 +1179,7 @@
                         let easting, northing;
                         if (window.proj4) {
                             const def = `+proj=utm +zone=${zone} ${isNorth ? '+north' : '+south'} +datum=WGS84 +units=m +no_defs`;
-                            const out = window.proj4('EPSG:4326', def, [p.lng, p.lat]);
+                            const out = window.proj4('WGS84', def, [p.lng, p.lat]);
                             easting = out[0];
                             northing = out[1];
                         } else if (window.utm && window.utm.fromLatLon) {
