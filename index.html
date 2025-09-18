@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>نرم افزار نقشه برداری GPS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.3/dist/leaflet-geoman.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/icon.png">
@@ -339,30 +340,34 @@
             box-shadow: 0 0 10px var(--glow-color);
         }
         
-        /* استایل برای خروجی چاپ (قالب A4 پیشنهادی) */
+        /* استایل پایه برای خروجی چاپ (برای رندر html2canvas در حالت screen) */
+        .print-container { display: none; }
+        .print-container .page {
+            width: 210mm; height: 297mm; margin: auto; border: 3px solid #000; padding: 15px;
+            box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
+            background: #fff; color: #000; font-family: Tahoma, sans-serif;
+        }
+        .print-container h1 { text-align: center; margin-bottom: 15px; font-size: 20px; font-weight: bold; color: #000; text-shadow: none; }
+        .print-container .box { border: 2px solid #000; border-radius: 8px; padding: 10px; box-sizing: border-box; background: #fafafa; }
+        .print-container .map-main { width: 100%; height: 300px; margin-bottom: 15px; }
+        .print-container .utm-box { width: 100%; height: 140px; margin-bottom: 25px; text-align: center; font-size: 13px; }
+        .print-container .utm-box table { width: 100%; border-collapse: collapse; }
+        .print-container .utm-box th, .print-container .utm-box td { border: 1px solid #000; padding: 4px; }
+        .print-container .content-section { display: flex; gap: 15px; margin-top: 20px; }
+        .print-container .images { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        .print-container .satellite, .print-container .traffic { flex: 1; height: 120px; }
+        .print-container .info-box { flex: 1; font-size: 13px; display: flex; flex-direction: column; justify-content: space-between; }
+        .print-container .info-box table { width: 100%; border-collapse: collapse; }
+        .print-container .info-box td { padding: 4px; border-bottom: 1px solid #ccc; }
+        .print-container .desc { margin-top: 10px; height: 60px; }
+        .print-container .footer { display: flex; justify-content: space-between; margin-top: auto; font-size: 13px; font-weight: bold; }
+
+        /* استایل برای خروجی چاپ هنگام پرینت واقعی */
         @media print {
             body * { visibility: hidden; }
             .print-container, .print-container * { visibility: visible; }
             .print-container { position: absolute; inset: 0; margin: 0; padding: 0; }
-            .page {
-                width: 210mm; height: 297mm; margin: auto; border: 3px solid #000; padding: 15px;
-                box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
-                background: #fff; color: #000; font-family: Tahoma, sans-serif;
-            }
-            h1 { text-align: center; margin-bottom: 15px; font-size: 20px; font-weight: bold; color: #000; text-shadow: none; }
-            .box { border: 2px solid #000; border-radius: 8px; padding: 10px; box-sizing: border-box; background: #fafafa; }
-            .map-main { width: 100%; height: 300px; margin-bottom: 15px; }
-            .utm-box { width: 100%; height: 140px; margin-bottom: 25px; text-align: center; font-size: 13px; }
-            .utm-box table { width: 100%; border-collapse: collapse; }
-            .utm-box th, .utm-box td { border: 1px solid #000; padding: 4px; }
-            .content-section { display: flex; gap: 15px; margin-top: 20px; }
-            .images { flex: 1; display: flex; flex-direction: column; gap: 15px; }
-            .satellite, .traffic { flex: 1; height: 120px; }
-            .info-box { flex: 1; font-size: 13px; display: flex; flex-direction: column; justify-content: space-between; }
-            .info-box table { width: 100%; border-collapse: collapse; }
-            .info-box td { padding: 4px; border-bottom: 1px solid #ccc; }
-            .desc { margin-top: 10px; height: 60px; }
-            .footer { display: flex; justify-content: space-between; margin-top: auto; font-size: 13px; font-weight: bold; }
+            .print-container .page { width: 210mm; height: 297mm; }
         }
 
         /* نشانگر شمال برای خروجی تصویر */
@@ -515,6 +520,9 @@
             <div class="controls">
                 <button id="capture-point" class="btn btn-primary btn-3d"><i class="fas fa-map-marker-alt"></i> برداشت نقطه</button>
                 <button id="draw-mode" class="btn btn-secondary btn-3d"><i class="fas fa-pencil-alt"></i> ترسیم</button>
+                <button id="select-rect" class="btn btn-secondary btn-3d"><i class="fas fa-vector-square"></i> انتخاب</button>
+                <button id="move-last" class="btn btn-secondary btn-3d"><i class="fas fa-arrows-alt"></i> جابجایی انتها</button>
+                <button id="delete-point" class="btn btn-secondary btn-3d"><i class="fas fa-trash"></i> حذف نقطه</button>
                 <button id="finish-polygon" class="btn btn-secondary" disabled><i class="fas fa-check-circle"></i> اتمام</button>
                 <button id="review-data" class="btn btn-secondary" disabled><i class="fas fa-clipboard-check"></i> بررسی</button>
                 <button id="export-pdf" class="btn btn-secondary" disabled><i class="fas fa-file-pdf"></i> خروجی PDF</button>
@@ -704,6 +712,7 @@
 
     <!-- بارگذاری کتابخانه‌های مورد نیاز -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.3/dist/leaflet-geoman.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -715,11 +724,13 @@
     <script>
         // متغیرهای global
         let map, drawnItems, currentLocation, captureMode = false, drawMode = false;
-        let points = [], satelliteCount = 0, polyline = null, polygon = null;
+        let points = [], pointMarkers = [], satelliteCount = 0, polyline = null, polygon = null;
         let satelliteLayer, streetLayer, trafficLayer;
         let watchId = null;
         let deferredPrompt;
         let lastToastTime = 0;
+        let selectionRect = null, selectedMarkerSet = new Set();
+        let deleteMode = false, moveLastMode = false;
         
         // مقداردهی اولیه نقشه
         function initMap() {
@@ -738,18 +749,21 @@
             // افزودن لایه‌های مختلف
             streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 19
+                maxZoom: 19,
+                crossOrigin: true
             });
             
             satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 attribution: '&copy; Esri',
-                maxZoom: 19
+                maxZoom: 19,
+                crossOrigin: true
             }).addTo(map);
             
             trafficLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}', {
                 subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
                 attribution: '&copy; Google',
-                maxZoom: 19
+                maxZoom: 19,
+                crossOrigin: true
             });
             
             // ایجاد لایه برای اشیاء ترسیمی
@@ -764,6 +778,11 @@
             
             // بارگذاری داده‌های ذخیره شده
             loadSavedData();
+
+            // پیکربندی اولیه Geoman (غیرفعال کردن کنترل پیشفرض)
+            if (map.pm) {
+                map.pm.addControls({ position: 'topleft', drawMarker: false, drawCircleMarker: false, drawPolyline: false, drawPolygon: false, drawCircle: false, drawRectangle: false, cutPolygon: false, editMode: false, dragMode: false, rotateMode: false, removalMode: false });
+            }
         }
         
         // بارگذاری داده‌های ذخیره شده
@@ -774,42 +793,9 @@
                     points = savedData.points.map(p => L.latLng(p.lat, p.lng));
                     
                     // ترسیم مجدد نقاط و پلی‌گون
-                    points.forEach(point => {
-                        L.marker(point, {
-                            icon: L.divIcon({
-                                className: 'custom-marker',
-                                html: '<div style="background-color: var(--primary-color); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px var(--glow-color);"></div>',
-                                iconSize: [20, 20],
-                                iconAnchor: [10, 10]
-                            })
-                        }).addTo(drawnItems);
-                    });
+                    points.forEach(point => { createPointMarker(point); });
                     
-                    if (points.length > 1) {
-                        polyline = L.polyline(points, {
-                            color: 'orange',
-                            weight: 3,
-                            dashArray: '5, 10'
-                        }).addTo(drawnItems);
-                    }
-                    
-                    if (points.length >= 3) {
-                        document.getElementById('finish-polygon').disabled = false;
-                        polygon = L.polygon(points, {
-                            color: 'red',
-                            weight: 3,
-                            fillColor: 'rgba(255, 0, 0, 0.2)'
-                        }).addTo(drawnItems);
-                        
-                        // محاسبه مساحت
-                        const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
-                        document.getElementById('area').value = area.toFixed(2) + ' متر مربع';
-                        
-                        document.getElementById('review-data').disabled = false;
-                        document.getElementById('export-pdf').disabled = false;
-                        document.getElementById('export-kmz').disabled = false;
-                        document.getElementById('export-dxf').disabled = false;
-                    }
+                    redrawPaths();
                 }
             } catch (error) {
                 console.error('خطا در بارگذاری داده‌های ذخیره شده:', error);
@@ -937,36 +923,85 @@
         
         // افزودن نقطه به نقشه
         function addPoint(latlng) {
+            createPointMarker(latlng);
+            points.push(latlng);
+            saveData();
+            redrawPaths();
+        }
+
+        function createPointMarker(latlng) {
             const marker = L.marker(latlng, {
+                draggable: false,
                 icon: L.divIcon({
                     className: 'custom-marker',
-                    html: '<div style="background-color: var(--primary-color); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px var(--glow-color);"></div>',
+                    html: '<div class="marker-dot" style="background-color: var(--primary-color); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px var(--glow-color);"></div>',
                     iconSize: [20, 20],
                     iconAnchor: [10, 10]
                 })
             }).addTo(drawnItems);
-            
-            points.push(latlng);
-            
-            // ذخیره داده‌ها
-            saveData();
-            
-            // اگر بیش از یک نقطه داریم، خطوط را وصل کن
+
+            marker.on('click', () => {
+                if (deleteMode) {
+                    deleteMarker(marker);
+                }
+            });
+
+            marker.on('dragend', () => {
+                const idx = pointMarkers.indexOf(marker);
+                if (idx >= 0) {
+                    points[idx] = marker.getLatLng();
+                    redrawPaths();
+                    saveData();
+                }
+            });
+
+            pointMarkers.push(marker);
+            return marker;
+        }
+
+        function deleteMarker(marker) {
+            const idx = pointMarkers.indexOf(marker);
+            if (idx >= 0) {
+                drawnItems.removeLayer(marker);
+                pointMarkers.splice(idx, 1);
+                points.splice(idx, 1);
+                selectedMarkerSet.delete(marker);
+                redrawPaths();
+                saveData();
+            }
+        }
+
+        function calculateAreaSqMeters(latlngs) {
+            if (!latlngs || latlngs.length < 3) return 0;
+            const ring = latlngs.map(p => [p.lng, p.lat]);
+            // بستن حلقه
+            if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+                ring.push([ring[0][0], ring[0][1]]);
+            }
+            try { return turf.area(turf.polygon([ring])); } catch { return 0; }
+        }
+
+        function redrawPaths() {
+            if (polyline) { map.removeLayer(polyline); polyline = null; }
+            if (polygon) { map.removeLayer(polygon); polygon = null; }
+
             if (points.length > 1) {
-                if (polyline) {
-                    map.removeLayer(polyline);
+                polyline = L.polyline(points, { color: 'orange', weight: 3, dashArray: '5, 10' }).addTo(drawnItems);
+            }
+            if (points.length >= 3) {
+                document.getElementById('finish-polygon').disabled = false;
+            } else {
+                document.getElementById('finish-polygon').disabled = true;
+            }
+
+            // اگر پلی‌گون نهایی شده بود، دوباره مساحت را محاسبه کن
+            if (points.length >= 3) {
+                const area = calculateAreaSqMeters(points);
+                if (!isNaN(area)) {
+                    document.getElementById('area').value = area.toFixed(2) + ' متر مربع';
                 }
-                
-                polyline = L.polyline(points, {
-                    color: 'orange',
-                    weight: 3,
-                    dashArray: '5, 10'
-                }).addTo(drawnItems);
-                
-                // فعال کردن دکمه اتمام اگر حداقل ۳ نقطه داریم
-                if (points.length >= 3) {
-                    document.getElementById('finish-polygon').disabled = false;
-                }
+            } else {
+                document.getElementById('area').value = '';
             }
         }
         
@@ -995,8 +1030,8 @@
             document.getElementById('export-kmz').disabled = false;
             document.getElementById('export-dxf').disabled = false;
             
-            // محاسبه مساحت
-            const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+            // محاسبه مساحت با Turf
+            const area = calculateAreaSqMeters(points);
             document.getElementById('area').value = area.toFixed(2) + ' متر مربع';
             
             // نمایش پیش‌نمایش در فرم
@@ -1025,7 +1060,8 @@
             });
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+                attribution: '&copy; OpenStreetMap contributors',
+                crossOrigin: true
             }).addTo(previewMap);
             
             // اضافه کردن پلی‌گون به پیش‌نمایش
@@ -1107,10 +1143,10 @@
                     return m;
                 }
 
-                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
-                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'));
+                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
+                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }));
                 // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
-                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
+                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
 
                 // تبدیل صفحه به تصویر A4 و دانلود
                 await new Promise(r => setTimeout(r, 600));
@@ -1334,6 +1370,44 @@ EOF
                     map.off('click', handleMapClick);
                 }
             });
+
+            // حالت انتخاب مستطیلی
+            document.getElementById('select-rect').addEventListener('click', function() {
+                if (!map.pm) { showToast('ابزار ترسیم در دسترس نیست'); return; }
+                this.classList.toggle('btn-primary');
+                const isActive = this.classList.contains('btn-primary');
+                if (isActive) {
+                    // اگر قبلا مستطیل وجود دارد حذف شود
+                    if (selectionRect) { map.removeLayer(selectionRect); selectionRect = null; selectedMarkerSet.clear(); }
+                    map.pm.enableDraw('Rectangle', { snappable: true, continueDrawing: false });
+                    const onCreate = (e) => {
+                        if (!(e.layer instanceof L.Rectangle)) return;
+                        selectionRect = e.layer.addTo(map);
+                        map.pm.disableDraw('Rectangle');
+                        map.off('pm:create', onCreate);
+                        enableRectangleEdit();
+                        recomputeSelection();
+                    };
+                    map.on('pm:create', onCreate);
+                } else {
+                    map.pm.disableDraw('Rectangle');
+                }
+            });
+
+            // حالت جابجایی نقطه انتهایی
+            document.getElementById('move-last').addEventListener('click', function() {
+                moveLastMode = !moveLastMode;
+                this.classList.toggle('btn-primary', moveLastMode);
+                enableOrDisableLastMarkerDrag(moveLastMode);
+                if (moveLastMode) { showToast('نقطه انتهایی را جابجا کنید'); }
+            });
+
+            // حالت حذف نقطه
+            document.getElementById('delete-point').addEventListener('click', function() {
+                deleteMode = !deleteMode;
+                this.classList.toggle('btn-primary', deleteMode);
+                if (deleteMode) { showToast('برای حذف، روی نقطه کلیک کنید'); }
+            });
             
             // دکمه اتمام
             document.getElementById('finish-polygon').addEventListener('click', finishPolygon);
@@ -1448,6 +1522,34 @@ EOF
         // مدیریت کلیک روی نقشه در حالت ترسیم
         function handleMapClick(e) {
             addPoint(e.latlng);
+        }
+
+        function enableOrDisableLastMarkerDrag(enable) {
+            // غیرفعال کردن در همه مارکرها
+            pointMarkers.forEach(m => { if (m.dragging) m.dragging.disable(); if (m._icon) m._icon.style.cursor = 'pointer'; });
+            if (enable && pointMarkers.length > 0) {
+                const last = pointMarkers[pointMarkers.length - 1];
+                if (last.dragging) last.dragging.enable();
+                if (last._icon) last._icon.style.cursor = 'move';
+            }
+        }
+
+        function enableRectangleEdit() {
+            if (!selectionRect || !selectionRect.pm) return;
+            selectionRect.pm.enable({ allowSelfIntersection: false, draggable: true, snappable: true, preventMarkerRemoval: true });
+            selectionRect.on('pm:edit', recomputeSelection);
+            selectionRect.on('pm:drag', recomputeSelection);
+        }
+
+        function recomputeSelection() {
+            if (!selectionRect) return;
+            const bounds = selectionRect.getBounds();
+            selectedMarkerSet.clear();
+            pointMarkers.forEach(m => {
+                const isIn = bounds.contains(m.getLatLng());
+                if (m._icon) { m._icon.style.outline = isIn ? '2px solid yellow' : 'none'; }
+                if (isIn) { selectedMarkerSet.add(m); }
+            });
         }
         
         // پیامک غیرمزاحم
