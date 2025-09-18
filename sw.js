@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gps-mapper-v1';
+const CACHE_NAME = 'gps-mapper-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -22,6 +22,17 @@ self.addEventListener('install', function(event) {
       .then(function(cache) {
         return cache.addAll(urlsToCache);
       })
+  );
+});
+
+// Clean up old caches on activate
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      );
+    })
   );
 });
 
