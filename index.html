@@ -1156,7 +1156,15 @@
                 const zone = parseInt(document.getElementById('zone').value || '39', 10);
                 const hemisphere = document.getElementById('hemisphere').value === 'south' ? 'S' : 'N';
                 const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
-                points.forEach((p, idx) => {
+                // اگر points خالی بود، از پلی‌گون نهایی برای استخراج نقاط استفاده کن
+                let tablePoints = (points && points.length) ? points.slice() : [];
+                if ((!tablePoints || !tablePoints.length) && polygon && typeof polygon.getLatLngs === 'function') {
+                    const rings = polygon.getLatLngs();
+                    if (Array.isArray(rings) && rings.length > 0) {
+                        tablePoints = Array.isArray(rings[0]) ? rings[0] : rings;
+                    }
+                }
+                (tablePoints || []).forEach((p, idx) => {
                     try {
                         const utmCoord = window.utm.fromLatLon(p.lat, p.lng, zone, hemisphere !== 'S');
                         const tr = document.createElement('tr');
@@ -1174,27 +1182,39 @@
                     const container = document.getElementById(divId);
                     container.innerHTML = '';
                     const m = L.map(divId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
-                    baseLayer.addTo(m);
-                    if (polygon) {
-                        const pg = L.polygon(points, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.1)' }).addTo(m);
+                    const layer = baseLayer.addTo(m);
+                    // استفاده از نقاط پلی‌گون در صورت موجود بودن
+                    let drawPoints = (points && points.length) ? points : [];
+                    if ((!drawPoints || !drawPoints.length) && polygon && typeof polygon.getLatLngs === 'function') {
+                        const rings = polygon.getLatLngs();
+                        if (Array.isArray(rings) && rings.length > 0) {
+                            drawPoints = Array.isArray(rings[0]) ? rings[0] : rings;
+                        }
+                    }
+                    if (drawPoints && drawPoints.length >= 3) {
+                        const pg = L.polygon(drawPoints, { color: '#000', weight: 2, fillColor: 'rgba(0,0,0,0.15)', fillOpacity: 0.15 }).addTo(m);
                         m.fitBounds(pg.getBounds(), { padding: [10,10] });
-                    } else if (points.length) {
-                        const pl = L.polyline(points, { color: '#000', weight: 2 }).addTo(m);
+                    } else if (drawPoints && drawPoints.length >= 2) {
+                        const pl = L.polyline(drawPoints, { color: '#000', weight: 2 }).addTo(m);
                         m.fitBounds(pl.getBounds(), { padding: [10,10] });
                     } else if (currentLocation) {
                         m.setView(currentLocation.latlng, 16);
                     }
                     setTimeout(() => m.invalidateSize(), 100);
-                    return m;
+                    const loadPromise = new Promise(resolve => {
+                        layer.once('load', () => setTimeout(resolve, 150));
+                        setTimeout(resolve, 1200);
+                    });
+                    return { map: m, layer, loadPromise };
                 }
 
-                renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
-                renderLeafletStatic('print-satellite-map', L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: 'anonymous' }));
-                // استفاده از لایه خیابانی به جای ترافیک برای سازگاری خروجی تصویر
-                renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
+                const mainRes = renderLeafletStatic('print-main-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
+                // برای جلوگیری از تاریکی/سیاهی ناشی از CORS در html2canvas، برای ماهواره و ترافیک نیز از OSM استفاده می‌کنیم
+                const satRes = renderLeafletStatic('print-satellite-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
+                const trafRes = renderLeafletStatic('print-traffic-map', L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' }));
 
                 // تبدیل صفحه به تصویر A4 و دانلود
-                await new Promise(r => setTimeout(r, 600));
+                await Promise.all([mainRes.loadPromise, satRes.loadPromise, trafRes.loadPromise]);
                 const pageEl = document.querySelector('#print-output .page');
                 const canvas = await html2canvas(pageEl, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
                 const dataURL = canvas.toDataURL('image/png');
