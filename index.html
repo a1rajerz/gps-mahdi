@@ -1234,8 +1234,7 @@
                 });
                 showResultView(dataURL);
 
-                // پنهان‌سازی خروجی پس از تولید
-                setTimeout(() => { printRoot.style.display = 'none'; }, 200);
+                // خروجی چاپ در DOM باقی می‌ماند تا محتوای نقشه پایدار بماند
 
             } catch (err) {
                 console.error(err);
